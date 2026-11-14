@@ -198,6 +198,10 @@ enum BugSpaceThresholdTier
 
 
 #define CASTORIA_ARCANUM_COUNT 4
+// Summoned and solo TX share two virtual actions: slot 0 = Arcanum Wish, slot 1 = Arcanum Meteo.
+#define TX_ARCANUM_COUNT 2
+#define TX_ARCANUM_SLOT_WISH 0
+#define TX_ARCANUM_SLOT_METEO 1
 
 #include "battle_tx_rollback.h"
 
@@ -1280,7 +1284,8 @@ static inline bool32 IsSpreadMove(enum MoveTarget moveTarget)
 static inline bool32 IsArcanumAction(u32 battler)
 {
     if (TxRollbackHasWishes(battler))
-        return gChosenMovePos == MAX_MON_MOVES;
+        return gChosenMovePos >= MAX_MON_MOVES
+            && gChosenMovePos < MAX_MON_MOVES + TX_ARCANUM_COUNT;
     return !IsOnPlayerSide(battler)
         && gBattleMons[battler].species == SPECIES_CASTORIA
         && gChosenMovePos >= MAX_MON_MOVES
@@ -1290,7 +1295,7 @@ static inline bool32 IsArcanumAction(u32 battler)
 static inline u32 GetBattlerMoveSlotCount(u32 battler)
 {
     if (TxRollbackHasWishes(battler))
-        return MAX_MON_MOVES + 1;
+        return MAX_MON_MOVES + TX_ARCANUM_COUNT;
     if (gBattleStruct->castoria.arcanumMoves[0] == MOVE_NONE)
         return MAX_MON_MOVES;
 
@@ -1306,7 +1311,13 @@ static inline u16 GetBattlerMoveAtSlot(u32 battler, u32 slot)
     if (slot < MAX_MON_MOVES)
         return gBattleMons[battler].moves[slot];
     if (TxRollbackHasWishes(battler))
-        return slot == MAX_MON_MOVES ? MOVE_ARCANUM_WISH : MOVE_NONE;
+    {
+        if (slot == MAX_MON_MOVES + TX_ARCANUM_SLOT_WISH)
+            return MOVE_ARCANUM_WISH;
+        if (slot == MAX_MON_MOVES + TX_ARCANUM_SLOT_METEO)
+            return MOVE_ARCANUM_METEO;
+        return MOVE_NONE;
+    }
     if (!IsOnPlayerSide(battler)
      && gBattleMons[battler].species == SPECIES_CASTORIA
      && slot < MAX_MON_MOVES + CASTORIA_ARCANUM_COUNT)

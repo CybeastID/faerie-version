@@ -409,7 +409,7 @@ u8 CastoriaFindWorstMove(u32 castoriaBattler, u32 targetBattler)
 
 // Illusion, Evocation, Transformation themed starter set.
 static const u16 sArcanumPool[4] = {
-    MOVE_FIREBALL,      // Evocation
+    MOVE_ARCANUM_METEO, // Evocation (replaced Fireball; Arcanum is capped at four, AllMovesUnusable uses a u8 mask)
     MOVE_REVIVAL_BLESSING_2, // Revivify
     MOVE_ARCANUM_WISH,  // Once per battle; outcome selected by Special AI.
     MOVE_POLYMORPH,     // Transformation
@@ -454,8 +454,14 @@ bool32 IsArcanumSlotUsable(u32 battler, u32 slot)
     if (move == MOVE_NONE)
         return FALSE;
 
-    if (TxRollbackHasWishes(battler) && !TxRollbackHasUsableWish(battler))
-        return FALSE;
+    if (TxRollbackHasWishes(battler))
+    {
+        // The Wish requirement applies only to the Wish slot; Meteo never needs a usable Wish.
+        if (move == MOVE_ARCANUM_WISH && !TxRollbackHasUsableWish(battler))
+            return FALSE;
+        if (TxRollbackArcanumLocked(battler))
+            return FALSE;
+    }
 
     if (move == MOVE_ARCANUM_WISH && !TxRollbackHasWishes(battler)
      && !CastoriaCanWishFor(battler, CASTORIA_WISH_DOMINATION)

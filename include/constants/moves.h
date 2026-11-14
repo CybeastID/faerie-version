@@ -917,7 +917,7 @@ enum __attribute__((packed)) Move
     MOVE_POLYMORPH,
     MOVE_FIREBALL,
     MOVE_MAGEARMOR,
-    MOVE_MAGICMISSILE,
+    MOVE_ARCANUM_METEO, // replaced the removed Magic Missile; keeps later custom IDs stable
     MOVE_ARCANUM_WISH,
     MOVE_ROAR_OF_ETERNITY,
     MOVES_COUNT,

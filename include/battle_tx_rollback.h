@@ -29,6 +29,16 @@ enum TxRollbackCombatProfile
     TX_PROFILE_KOANKO_SOLO,
 };
 
+// One-turn lockout of all TX Arcanum choices after a successful Meteo (normal moves stay legal).
+// ARMED is set when Meteo resolves, stamped with that turn. The owner's next end-of-turn
+// pass on a later turn clears it exactly once, so the next active turn is locked even if the
+// action itself is blocked. A turn passes the owner by only while it is absent.
+enum TxArcanumLock
+{
+    TX_ARCANUM_LOCK_NONE,
+    TX_ARCANUM_LOCK_ARMED,
+};
+
 enum TxRollbackWish
 {
     TX_WISH_NONE,
@@ -62,6 +72,9 @@ struct TxRollbackBattleData
     const struct TxRollbackProfile *profile;
     struct TxRollbackHealth health;
     u8 combatProfile;
+    u8 arcanumLock; // enum TxArcanumLock; combat-owner state, not position state.
+    u8 arcanumLockTurn; // battleTurnCounter when armed.
+    bool8 meteoHitLanded; // At least one target resolved a successful hit this action.
     u8 ownerTrainer;
     bool8 ownerDefeated;
     u8 stage;
@@ -108,6 +121,11 @@ void BS_TxRollbackEndurance(void);
 void BS_TxRollbackBeginPhase(void);
 void BS_TxRollbackEndPhase(void);
 void BS_TxRollbackReduction(void);
+bool32 TxRollbackArcanumLocked(u32 battler);
+void TxRollbackArcanumOnAttackSuccess(u32 battler);
+void TxRollbackMeteoRecordTarget(u32 attacker, u32 target);
+void TxRollbackMeteoFinishAction(u32 attacker);
+bool32 TxRollbackArcanumEndTurn(enum BattlerId battler);
 void BS_TxRollbackPrepareDoomDesire(void);
 void TxRollbackMirrorHealing(u32 battler, u32 oldHp, const u8 *returnInstr);
 void BS_TxRollbackBeginReciprocity(void);

@@ -62,6 +62,7 @@ enum EndTurnResolutionOrder
     ENDTURN_INFINITE_GROWTH,     // Infinite Growth stat boost + HP regen
     ENDTURN_MELT_VIRUS,          // Melt Virus draining
     ENDTURN_REDUCTION,
+    ENDTURN_TX_ARCANUM_LOCK,
     ENDTURN_TRAINER_A_SLIDES,
     ENDTURN_TRAINER_B_SLIDES,
     ENDTURN_TRAINER_PARTNER_SLIDES,

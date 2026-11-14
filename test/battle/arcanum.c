@@ -54,7 +54,7 @@ static u32 ArcanumTestChooseMove(u32 battler, u64 flags, AiScoreFunc callback)
 
 ASSUMPTIONS
 {
-    ASSUME(Test_GetCastoriaArcanumMove(0) == MOVE_FIREBALL);
+    ASSUME(Test_GetCastoriaArcanumMove(0) == MOVE_ARCANUM_METEO);
     ASSUME(Test_GetCastoriaArcanumMove(1) == MOVE_REVIVAL_BLESSING_2);
 }
 
@@ -701,7 +701,7 @@ SINGLE_BATTLE_TEST("Arcanum Special AI requires both the flag and a registered c
     } WHEN {
         TURN { MOVE(opponent, MOVE_CELEBRATE); }
     } THEN {
-        sArcanumTestPreferredMove = MOVE_FIREBALL;
+        sArcanumTestPreferredMove = MOVE_ARCANUM_METEO;
         sArcanumTestSpellScore = 101;
         sArcanumTestRegularScore = 100;
         EXPECT_EQ(ArcanumTestChooseMove(B_POSITION_OPPONENT_LEFT, flags,
@@ -727,11 +727,11 @@ SINGLE_BATTLE_TEST("Arcanum Special AI preserves regular ties and can adjust reg
     GIVEN {
         PLAYER(SPECIES_WOBBUFFET);
         // Same move ID in an ordinary slot and the virtual pool.
-        OPPONENT(SPECIES_CASTORIA) { Moves(MOVE_FIREBALL); }
+        OPPONENT(SPECIES_CASTORIA) { Moves(MOVE_ARCANUM_METEO); }
     } WHEN {
         TURN { MOVE(opponent, arcanumSlot: 1); }
     } THEN {
-        sArcanumTestPreferredMove = MOVE_FIREBALL;
+        sArcanumTestPreferredMove = MOVE_ARCANUM_METEO;
         sArcanumTestSpellScore = spellScore;
         sArcanumTestRegularScore = regularScore;
         EXPECT_EQ(ArcanumTestChooseMove(B_POSITION_OPPONENT_LEFT, AI_FLAG_DYNAMIC_FUNC,
@@ -739,8 +739,8 @@ SINGLE_BATTLE_TEST("Arcanum Special AI preserves regular ties and can adjust reg
         EXPECT_EQ(sArcanumTestRegularCalls, 1);
         EXPECT_EQ(sArcanumTestSpellCalls, 4);
         EXPECT_EQ(gAiThinkingStruct->score[0], regularScore);
-        EXPECT_EQ(opponent->moves[0], MOVE_FIREBALL);
-        EXPECT_EQ(opponent->pp[0], GetMovePP(MOVE_FIREBALL));
+        EXPECT_EQ(opponent->moves[0], MOVE_ARCANUM_METEO);
+        EXPECT_EQ(opponent->pp[0], GetMovePP(MOVE_ARCANUM_METEO));
         EXPECT_EQ(BattleAI_IsScoringArcanum(), FALSE);
         EXPECT_EQ(sArcanumTestUsedVirtualIndex, FALSE);
         SetDynamicAiFunc(NULL);
@@ -793,7 +793,7 @@ SINGLE_BATTLE_TEST("Arcanum Special AI leaves non-owners and empty pools on ordi
             gBattleStruct->castoria.arcanumMoves[0] = MOVE_NONE;
         else
             opponent->species = SPECIES_WOBBUFFET;
-        sArcanumTestPreferredMove = MOVE_FIREBALL;
+        sArcanumTestPreferredMove = MOVE_ARCANUM_METEO;
         sArcanumTestSpellScore = 200;
         sArcanumTestRegularScore = 100;
         EXPECT_EQ(ArcanumTestChooseMove(B_POSITION_OPPONENT_LEFT, AI_FLAG_DYNAMIC_FUNC,
@@ -1079,7 +1079,7 @@ SINGLE_BATTLE_TEST("Arcanum ignores exhausted regular PP when another regular mo
     } WHEN {
         TURN { MOVE(opponent, arcanumSlot: 0); }
     } SCENE {
-        MESSAGE("The opposing Caster? cast Fireball!");
+        MESSAGE("The opposing Caster? cast Meteo!");
         HP_BAR(player);
     } THEN {
         EXPECT_EQ(opponent->pp[0], 0);
@@ -1097,7 +1097,7 @@ SINGLE_BATTLE_TEST("Arcanum remains selectable when every regular move has zero 
     } WHEN {
         TURN { MOVE(opponent, arcanumSlot: 0); }
     } SCENE {
-        MESSAGE("The opposing Caster? cast Fireball!");
+        MESSAGE("The opposing Caster? cast Meteo!");
         HP_BAR(player);
         NOT ANIMATION(ANIM_TYPE_MOVE, MOVE_STRUGGLE, opponent);
     } THEN {
@@ -1130,7 +1130,7 @@ SINGLE_BATTLE_TEST("Arcanum availability checks bounds ownership empty pools and
         EXPECT_EQ(IsArcanumSlotUsable(battler, 4), TRUE);
         gBattleMons[battler].volatiles.tauntTimer = 0;
 
-        gBattleMons[battler].volatiles.disabledMove = MOVE_FIREBALL;
+        gBattleMons[battler].volatiles.disabledMove = MOVE_ARCANUM_METEO;
         EXPECT_EQ(IsArcanumSlotUsable(battler, 4), FALSE);
         gBattleMons[battler].volatiles.disabledMove = MOVE_NONE;
 
@@ -1253,7 +1253,7 @@ SINGLE_BATTLE_TEST("Arcanum AI damage reads handle virtual and invalid slots wit
         EXPECT_EQ(AI_GetDamage(attacker, defender, 5, AI_ATTACKING, gAiLogicData), 0);
         EXPECT_EQ(AI_GetDamage(attacker, defender, 8, AI_ATTACKING, gAiLogicData), 0);
         EXPECT_EQ(AI_GetDamage(attacker, defender, 255, AI_ATTACKING, gAiLogicData), 0);
-        EXPECT_EQ(AI_GetDamageForMove(attacker, defender, MOVE_FIREBALL, AI_ATTACKING, gAiLogicData), damage);
+        EXPECT_EQ(AI_GetDamageForMove(attacker, defender, MOVE_ARCANUM_METEO, AI_ATTACKING, gAiLogicData), damage);
         EXPECT_EQ(opponent->species, species);
         EXPECT_EQ(opponent->hp, hp);
         // The target determines AI ownership from the controller, not side.
@@ -1277,18 +1277,18 @@ SINGLE_BATTLE_TEST("Arcanum casts from virtual slots without consuming regular P
 {
     GIVEN {
         PLAYER(SPECIES_WOBBUFFET);
-        OPPONENT(SPECIES_CASTORIA) { Moves(MOVE_CELEBRATE, MOVE_SPLASH, MOVE_TACKLE, MOVE_FIREBALL); }
+        OPPONENT(SPECIES_CASTORIA) { Moves(MOVE_CELEBRATE, MOVE_SPLASH, MOVE_TACKLE, MOVE_ARCANUM_METEO); }
     } WHEN {
         TURN { MOVE(opponent, arcanumSlot: 0); }
     } SCENE {
-        MESSAGE("The opposing Caster? cast Fireball!");
-        ANIMATION(ANIM_TYPE_MOVE, MOVE_FIREBALL, opponent);
+        MESSAGE("The opposing Caster? cast Meteo!");
+        ANIMATION(ANIM_TYPE_MOVE, MOVE_ARCANUM_METEO, opponent);
         HP_BAR(player);
     } THEN {
         EXPECT_EQ(opponent->pp[0], GetMovePP(MOVE_CELEBRATE));
         EXPECT_EQ(opponent->pp[1], GetMovePP(MOVE_SPLASH));
         EXPECT_EQ(opponent->pp[2], GetMovePP(MOVE_TACKLE));
-        EXPECT_EQ(opponent->pp[3], GetMovePP(MOVE_FIREBALL));
+        EXPECT_EQ(opponent->pp[3], GetMovePP(MOVE_ARCANUM_METEO));
     }
 }
 
@@ -1298,9 +1298,9 @@ SINGLE_BATTLE_TEST("Arcanum spell IDs in regular slots still say used")
         PLAYER(SPECIES_WOBBUFFET);
         OPPONENT(SPECIES_CASTORIA);
     } WHEN {
-        TURN { MOVE(opponent, MOVE_FIREBALL); }
+        TURN { MOVE(opponent, MOVE_ARCANUM_METEO); }
     } SCENE {
-        MESSAGE("The opposing Caster? used Fireball!");
+        MESSAGE("The opposing Caster? used Meteo!");
         HP_BAR(player);
     }
 }
@@ -1377,19 +1377,19 @@ SINGLE_BATTLE_TEST("Arcanum KO under Grudge leaves regular PP intact")
     GIVEN {
         PLAYER(SPECIES_WOBBUFFET) { HP(1); Speed(20); }
         PLAYER(SPECIES_WOBBUFFET) { Speed(20); }
-        OPPONENT(SPECIES_CASTORIA) { Speed(10); Moves(MOVE_CELEBRATE, MOVE_SPLASH, MOVE_TACKLE, MOVE_FIREBALL); }
+        OPPONENT(SPECIES_CASTORIA) { Speed(10); Moves(MOVE_CELEBRATE, MOVE_SPLASH, MOVE_TACKLE, MOVE_ARCANUM_METEO); }
     } WHEN {
         TURN { MOVE(player, MOVE_GRUDGE); MOVE(opponent, arcanumSlot: 0); SEND_OUT(player, 1); }
     } SCENE {
         MESSAGE("Wobbuffet used Grudge!");
-        MESSAGE("The opposing Caster? cast Fireball!");
+        MESSAGE("The opposing Caster? cast Meteo!");
         MESSAGE("Wobbuffet fainted!");
-        NOT MESSAGE("The opposing Caster?'s Fireball lost all its PP due to the grudge!");
+        NOT MESSAGE("The opposing Caster?'s Meteo lost all its PP due to the grudge!");
     } THEN {
         EXPECT_EQ(opponent->pp[0], GetMovePP(MOVE_CELEBRATE));
         EXPECT_EQ(opponent->pp[1], GetMovePP(MOVE_SPLASH));
         EXPECT_EQ(opponent->pp[2], GetMovePP(MOVE_TACKLE));
-        EXPECT_EQ(opponent->pp[3], GetMovePP(MOVE_FIREBALL));
+        EXPECT_EQ(opponent->pp[3], GetMovePP(MOVE_ARCANUM_METEO));
     }
 }
 

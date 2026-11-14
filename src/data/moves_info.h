@@ -22346,29 +22346,6 @@ const struct MoveInfo gMovesInfo[MOVES_COUNT_ALL] =
         .battleAnimScript = gBattleAnimMove_LightScreen,
     },
 
-    [MOVE_MAGICMISSILE] =
-    {
-        .name = COMPOUND_STRING("Magic Missile"),
-        .description = COMPOUND_STRING(
-            "A never-missing bolt of\n"
-            "magical energy."),
-        .effect = EFFECT_HIT,
-        .power = 60,
-        .type = TYPE_NORMAL,
-        .accuracy = 0,
-        .pp = 5,
-        .target = TARGET_SELECTED,
-        .priority = 0,
-        .category = DAMAGE_CATEGORY_SPECIAL,
-        .zMove = { .effect = Z_EFFECT_NONE },
-        .mirrorMoveBanned = TRUE,
-        .mimicBanned = TRUE,
-        .copycatBanned = TRUE,
-        .assistBanned = TRUE,
-        .battleAnimScript = gBattleAnimMove_Swift,
-    },
-    
-
     [MOVE_ARCANUM_WISH] =
     {
         .name = COMPOUND_STRING("Wish"),
@@ -22425,6 +22402,36 @@ const struct MoveInfo gMovesInfo[MOVES_COUNT_ALL] =
             .moveEffect = MOVE_EFFECT_TIMESTOP,
             .chance = 50,
         }),
+    },
+
+    // Encounter-only spell: Castoria's fifth Arcanum and the second TX virtual action.
+    // Native Stellar; ordinary damage/spread rules apply, no secondary effect, no recharge.
+    [MOVE_ARCANUM_METEO] =
+    {
+        .name = COMPOUND_STRING("Meteo"),
+        .description = COMPOUND_STRING(
+            "Calls down a rain of stellar\n"
+            "meteors on all opposing foes."),
+        .effect = EFFECT_HIT,
+        .power = 150,
+        .type = TYPE_STELLAR,
+        .accuracy = 100,
+        .pp = 5,
+        .target = TARGET_BOTH,
+        .priority = 0,
+        .category = DAMAGE_CATEGORY_SPECIAL,
+        .zMove = { .effect = Z_EFFECT_NONE },
+        .mirrorMoveBanned = TRUE,
+        .mimicBanned = TRUE,
+        .sketchBanned = TRUE,
+        .metronomeBanned = TRUE,
+        .copycatBanned = TRUE,
+        .instructBanned = TRUE,
+        .assistBanned = TRUE,
+        .sleepTalkBanned = TRUE,
+        .meFirstBanned = TRUE,
+        // Placeholder visuals: the composed Meteo animation is a separate step.
+        .battleAnimScript = gBattleAnimMove_DracoMeteor,
     },
 
     // Z-Moves

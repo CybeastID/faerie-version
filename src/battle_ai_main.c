@@ -1038,7 +1038,8 @@ static u32 ChooseArcanumForTarget(u32 battler, u32 opposingBattler, s32 normalSc
                 bestArcanumSlot = i;
                 bestWishOutcome = move == MOVE_ARCANUM_WISH
                     ? (tx ? gBattleStruct->txRollback.wishCandidate : gBattleStruct->castoria.wishCandidate) : CASTORIA_WISH_NONE;
-                if (tx && gBattleStruct->txRollback.wishCandidateTarget < gBattlersCount)
+                if (tx && move == MOVE_ARCANUM_WISH
+                 && gBattleStruct->txRollback.wishCandidateTarget < gBattlersCount)
                     *wishTarget = gBattlerPartyIndexes[gBattleStruct->txRollback.wishCandidateTarget];
             }
         }
@@ -7557,8 +7558,27 @@ static s32 AR_RazeMoves(u32 battlerAtk, u32 battlerDef, u32 move, s32 score)
     return score;
 }
 
+/* Shared by Castoria's virtual Meteo and the TX profiles' slot 5. Scored per target like any
+ * other candidate: the ordinary damage engine applies spread reduction at execution time. */
+static s32 AR_MeteoScore(u32 a, u32 d, u32 move, s32 score)
+{
+    /* Virtual spell has no ordinary four-slot cache entry. Use the existing
+     * save/restore simulation wrapper, never a temporary installed move. */
+    uq4_12_t effectiveness;
+    struct SimulatedDamage damage = AI_CalcDamageSaveBattlers(move, a, d,
+        &effectiveness, GIMMICK_NONE, GIMMICK_NONE);
+    u32 accuracy = min(100, Ai_SetMoveAccuracy(gAiLogicData, a, d, move));
+    u32 expected = AI_GetReachableDamage(d, damage.median) * accuracy / 100;
+    if (effectiveness == UQ_4_12(0.0) || expected == 0 || AR_Finish(a, d))
+        return 0;
+    /* Require a material coverage improvement to spend finite spell uses. */
+    return expected * 100 > AR_Best(a, d) * 120 ? score + 8 : 0;
+}
+
 static s32 AR_TxSpell(u32 a, u32 d, u32 move)
 {
+    if (move == MOVE_ARCANUM_METEO)
+        return AR_MeteoScore(a, d, move, AI_SCORE_DEFAULT);
     if (move != MOVE_ARCANUM_WISH)
         return 0;
     u32 chosen = TX_WISH_NONE, recipient = MAX_BATTLERS_COUNT;
@@ -7658,20 +7678,8 @@ static s32 AR_CastoriaSpell(u32 a, u32 d, u32 move, s32 score)
         gBattleStruct->castoria.wishCandidate = wish;
         return value;
     }
-    if (move == MOVE_FIREBALL)
-    {
-        /* Virtual spell has no ordinary four-slot cache entry. Use the existing
-         * save/restore simulation wrapper, never a temporary installed move. */
-        uq4_12_t effectiveness;
-        struct SimulatedDamage damage = AI_CalcDamageSaveBattlers(move, a, d,
-            &effectiveness, GIMMICK_NONE, GIMMICK_NONE);
-        u32 accuracy = min(100, Ai_SetMoveAccuracy(gAiLogicData, a, d, move));
-        u32 expected = AI_GetReachableDamage(d, damage.median) * accuracy / 100;
-        if (effectiveness == UQ_4_12(0.0) || expected == 0 || AR_Finish(a, d))
-            return 0;
-        /* Require a material coverage improvement to spend finite spell uses. */
-        return expected * 100 > AR_Best(a, d) * 120 ? score + 8 : 0;
-    }
+    if (move == MOVE_ARCANUM_METEO)
+        return AR_MeteoScore(a, d, move, score);
     return 0;
 }
 

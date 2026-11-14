@@ -1845,6 +1845,7 @@ static bool32 (*const sEndTurnEffectHandlers[])(enum BattlerId battler) =
     [ENDTURN_INFINITE_GROWTH] = HandleEndTurnInfiniteGrowth,
     [ENDTURN_MELT_VIRUS] = HandleEndTurnMeltVirus,
     [ENDTURN_REDUCTION] = ReductionEndTurn,
+    [ENDTURN_TX_ARCANUM_LOCK] = TxRollbackArcanumEndTurn,
     [ENDTURN_TRAINER_A_SLIDES] = HandleEndTurnTrainerASlides,
     [ENDTURN_TRAINER_B_SLIDES] = HandleEndTurnTrainerBSlides,
     [ENDTURN_TRAINER_PARTNER_SLIDES] = HandleEndTurnTrainerPartnerSlides,

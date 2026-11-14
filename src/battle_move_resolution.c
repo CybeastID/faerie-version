@@ -1,5 +1,6 @@
 #include "global.h"
 #include "battle.h"
+#include "battle_tx_rollback.h"
 #include "battle_arena.h"
 #include "battle_environment.h"
 #include "battle_hold_effects.h"
@@ -3956,6 +3957,7 @@ static enum MoveEndResult MoveEndNextTarget(struct BattleCalcValues *cv)
     enum MoveTarget moveTarget = GetBattlerMoveTargetType(gBattlerAttacker, gCurrentMove);
 
     gBattleStruct->battlerState[gBattlerAttacker].targetsDone[gBattlerTarget] = TRUE;
+    TxRollbackMeteoRecordTarget(gBattlerAttacker, gBattlerTarget);
 
     if (gBattleStruct->unableToUseMove || gProtectStructs[gBattlerAttacker].chargingTurn)
     {
@@ -5289,6 +5291,7 @@ static enum MoveEndResult MoveEndClearBits(struct BattleCalcValues *cv)
     }
 
     ValidateBattlers();
+    TxRollbackMeteoFinishAction(gBattlerAttacker);
 
     enum Move originallyUsedMove = GetOriginallyUsedMove(gChosenMove);
     enum Type moveType = GetBattleMoveType(cv->move);

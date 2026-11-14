@@ -722,7 +722,7 @@ AI_SINGLE_BATTLE_TEST("Arcanum Wish More Wishes preserves Castoria's virtual Arc
     GIVEN {
         AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
         MoreWishesFixture();
-        sPostSummonSpell = MOVE_FIREBALL;
+        sPostSummonSpell = MOVE_ARCANUM_METEO;
         PLAYER(SPECIES_WOBBUFFET) { HP(600); MaxHP(600); Speed(10); Moves(MOVE_CELEBRATE); }
         OPPONENT(SPECIES_CASTORIA) { Speed(20); Moves(MOVE_CELEBRATE); }
         OPPONENT(SPECIES_WOBBUFFET) { HP(0); Speed(5); }
@@ -735,12 +735,12 @@ AI_SINGLE_BATTLE_TEST("Arcanum Wish More Wishes preserves Castoria's virtual Arc
         TURN { MOVE(player, MOVE_CELEBRATE); }
     } SCENE {
         MESSAGE("The wish created TX Rollback!");
-        MESSAGE("The opposing Caster? cast Fireball!");
-        ANIMATION(ANIM_TYPE_MOVE, MOVE_FIREBALL, opponent);
+        MESSAGE("The opposing Caster? cast Meteo!");
+        ANIMATION(ANIM_TYPE_MOVE, MOVE_ARCANUM_METEO, opponent);
         HP_BAR(player);
     } THEN {
         EXPECT_EQ(gBattleStruct->chosenMovePositions[1], MAX_MON_MOVES);
-        EXPECT_EQ(gChosenMoveByBattler[1], MOVE_FIREBALL);
+        EXPECT_EQ(gChosenMoveByBattler[1], MOVE_ARCANUM_METEO);
         EXPECT_EQ(opponent->moves[0], MOVE_CELEBRATE);
         EXPECT_EQ(opponent->pp[0], GetMovePP(MOVE_CELEBRATE));
         EXPECT_EQ(sAmbushCalls, 1);

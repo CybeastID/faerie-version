@@ -821,7 +821,7 @@ AI_SINGLE_BATTLE_TEST("TX Wishes ownership and Restoration eligibility reject re
         gBattleMons[3].species = SPECIES_JIRACHI;
         EXPECT_EQ(TxRollbackHasWishes(3), TRUE);
         EXPECT_EQ(GetBattlerMoveAtSlot(3, MAX_MON_MOVES), MOVE_ARCANUM_WISH);
-        EXPECT_EQ(GetBattlerMoveSlotCount(3), MAX_MON_MOVES + 1);
+        EXPECT_EQ(GetBattlerMoveSlotCount(3), MAX_MON_MOVES + TX_ARCANUM_COUNT);
         gBattleMons[3].volatiles.tauntTimer = 2;
         EXPECT_EQ(IsArcanumSlotUsable(3, MAX_MON_MOVES), FALSE);
         gBattleMons[3].volatiles.tauntTimer = 0;

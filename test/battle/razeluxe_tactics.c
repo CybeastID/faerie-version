@@ -12,7 +12,7 @@
 //
 // NOT COVERED YET: Alakazam Trace/Unaware setup, Hoopa-Unbound Drain Punch/Fury/Protect, Castoria Wish
 // ranking (More Wishes / Endurance / Reduction / Debilitation), emergency Perish Revivify, Polymorph
-// selection, Fireball vs ordinary score scale, summoned-TX virtual Wishes, callback isolation.
+// selection, Meteo vs ordinary score scale, summoned-TX virtual Wishes, callback isolation.
 
 extern AiScoreFunc sDynamicAiFunc;
 s32 AI_RazeluxeTrainer(u32 battlerAtk, u32 battlerDef, u32 move, s32 score);

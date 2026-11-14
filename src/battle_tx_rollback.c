@@ -338,7 +338,56 @@ void TxRollbackOnFaint(u32 battler)
         data->wishCandidate = data->wishOutcome = TX_WISH_NONE;
         data->wishCandidateTarget = MAX_BATTLERS_COUNT;
         data->wishTargetPartyIndex = PARTY_SIZE;
+        data->arcanumLock = TX_ARCANUM_LOCK_NONE;
     }
+}
+
+bool32 TxRollbackArcanumLocked(u32 battler)
+{
+    return gBattleStruct != NULL && gBattleStruct->txRollback.arcanumLock != TX_ARCANUM_LOCK_NONE
+        && TxRollbackHasWishes(battler);
+}
+
+// Called once per resolved Meteo action, outside any per-target loop.
+void TxRollbackArcanumOnAttackSuccess(u32 battler)
+{
+    struct TxRollbackBattleData *data = &gBattleStruct->txRollback;
+    if (!TxRollbackHasWishes(battler))
+        return;
+    data->arcanumLock = TX_ARCANUM_LOCK_ARMED;
+    data->arcanumLockTurn = gBattleResults.battleTurnCounter;
+}
+
+// Success = at least one target reaches a successful hit resolution (a Substitute or bar hit
+// counts). Misses, all-target Protect/immunity and cancelled actions never record.
+void TxRollbackMeteoRecordTarget(u32 attacker, u32 target)
+{
+    if (gCurrentMove == MOVE_ARCANUM_METEO && IsArcanumAction(attacker)
+     && TxRollbackHasWishes(attacker) && !gBattleStruct->unableToUseMove
+     && !IsBattlerUnaffectedByMove(target))
+        gBattleStruct->txRollback.meteoHitLanded = TRUE;
+}
+
+void TxRollbackMeteoFinishAction(u32 attacker)
+{
+    struct TxRollbackBattleData *data = &gBattleStruct->txRollback;
+    if (data->meteoHitLanded)
+        TxRollbackArcanumOnAttackSuccess(attacker);
+    data->meteoHitLanded = FALSE;
+}
+
+// The turn counter advances after end-of-turn effects, so the casting turn's own pass sees an
+// equal counter and keeps the lock; the next turn the owner is present for clears it once.
+bool32 TxRollbackArcanumEndTurn(enum BattlerId battler)
+{
+    struct TxRollbackBattleData *data = &gBattleStruct->txRollback;
+    gBattleStruct->eventState.endTurnBattler++;
+    if (data->arcanumLock == TX_ARCANUM_LOCK_ARMED
+     && gBattleResults.battleTurnCounter > data->arcanumLockTurn
+     && IsBattlerPresent(battler)
+     && TxRollbackHasWishes(battler))
+        data->arcanumLock = TX_ARCANUM_LOCK_NONE;
+    return FALSE;
 }
 
 bool32 TxRollbackTryAmbush(void)
