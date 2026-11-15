@@ -78,6 +78,13 @@
     "gMapGroup_IndoorSixIslandRoute_Frlg",
     "gMapGroup_IndoorSevenIslandRoute_Frlg"
   ],
+  "gMapGroup_RazeluxeDomain": [
+    "Test",
+    "MysteryZone",
+    "CastersTerrarium",
+    "CastersTerrariumExterior",
+    "IntermediateWarpMap"
+  ],
   "gMapGroup_TownsAndRoutes": [
     "PetalburgCity",
     "SlateportCity",
@@ -666,6 +673,11 @@
   "gMapGroup_IndoorRoute124": [
     "Route124_DivingTreasureHuntersHouse"
   ],
+  "gMapGroup_LudenSpace": [
+    "AliceRoom",
+    "AlicesRoom",
+    "AliceRoomReal"
+  ],
   "gMapGroup_Link_Frlg": [
     "BattleColosseum_2P_Frlg",
     "TradeCenter_Frlg",
@@ -1164,17 +1176,5 @@
   ],
   "gMapGroup_IndoorSevenIslandRoute_Frlg": [
     "SevenIsland_SevaultCanyon_House_Frlg"
-  ],
-  "gMapGroup_RazeluxeDomain": [
-    "Test",
-    "MysteryZone",
-    "CastersTerrarium",
-    "CastersTerrariumExterior",
-    "IntermediateWarpMap"
-  ],
-  "gMapGroup_LudenSpace": [
-    "AliceRoom",
-    "AlicesRoom",
-    "AliceRoomReal"
   ]
 }

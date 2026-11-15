@@ -13327,15 +13327,15 @@ const struct SpeciesInfo gSpeciesInfoGen3[] =
         .bodyColor = BODY_COLOR_PURPLE,
         .speciesName = _("TX Rollback"),
         .cryId = CRY_JIRACHI,
-        .natDexNum = NATIONAL_DEX_JIRACHI,
-        .categoryName = _("Wish"),
+        .natDexNum = NATIONAL_DEX_TXROLLBACK,
+        .categoryName = _("Wish Titan"),
         .height = 3,
         .weight = 11,
         .description = COMPOUND_STRING(
-            "Jirachi is said to make wishes come true.\n"
-            "While it sleeps, a tough crystalline shell\n"
-            "envelops the body to protect it from\n"
-            "enemies."),
+            "Unlike Jirachi, this Pokémon grows stronger\n"
+            "with every wish it grants. Its true eye never\n"
+            "closes, and it eagerly fulfills the desires of\n"
+            "the fairy that brought it into existence."),
         .pokemonScale = 608,
         .pokemonOffset = -8,
         .trainerScale = 256,

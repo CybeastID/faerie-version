@@ -230,7 +230,6 @@ Debug_EventScript_Script_4::
     lockall
     getpartysize
     goto_if_eq VAR_RESULT, 0, Debug_NoPokemon
-	setflag FLAG_CASTER_DEBUG
 	setdynamicaifunc AI_RazeluxeTrainer;
     callnative Script_StartCasterDebugBattle, TRUE
     releaseall
