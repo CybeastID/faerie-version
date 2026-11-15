@@ -647,24 +647,89 @@ void BS_SyncSavedBreakBarHp(void)
 void BS_RevealSavedBreakBar(void)
 {
     NATIVE_ARGS(u8 battler);
+
     if (gBattleControllerExecFlags)
         return;
-    u32 battler = GetBattlerForBattleScript(cmd->battler);
-    if (GetHealthbarSprite(battler) != MAX_SPRITES)
-    {
-    UpdateHealthboxAttribute(
-        gHealthboxSpriteIds[battler],
-        GetBattlerMon(battler),
-        HEALTHBOX_HEALTH_BAR);
 
-    if (IsOnPlayerSide(battler))
+    u32 battler = GetBattlerForBattleScript(cmd->battler);
+    struct PartyState *owner = GetBreakBarOwner(battler);
+
+    if (owner == NULL || GetHealthbarSprite(battler) == MAX_SPRITES)
+    {
+        gBattlescriptCurrInstr = cmd->nextInstr;
+        return;
+    }
+
+    u32 hp = gBattleMons[battler].hp;
+    u32 maxHp = gBattleMons[battler].maxHP;
+
+    if (maxHp == 0)
+    {
+        gBattlescriptCurrInstr = cmd->nextInstr;
+        return;
+    }
+
+    u32 targetPixels = min(
+        hp * B_HEALTHBAR_PIXELS / maxHp,
+        B_HEALTHBAR_PIXELS);
+
+    if (hp != 0 && targetPixels == 0)
+        targetPixels = 1;
+
+    u32 pixels = min(owner->breakBarFillPixels, targetPixels);
+
+    // Draw the revealed layer progressively from empty.
+    bool32 drew;
+    if (GetBreakBarCount(battler) != 0)
+    {
+        // Extra Break Bars remaining:
+        // Use the currently selected Break Bar color.
+        drew = DrawHealthbarOverlay(battler, 0, 1, pixels);
+    }
+    else
+    {
+        // Final HP layer:
+        // Use the red tiles regardless of HP percentage.
+        drew = DrawHealthbarOverlay(
+            battler, pixels, B_HEALTHBAR_PIXELS, 0);
+    }
+    if (drew && IsOnPlayerSide(battler))
+    {
+        u32 displayedHp = min(
+            maxHp * pixels / B_HEALTHBAR_PIXELS,
+            hp);
+
+        if (pixels != 0 && hp != 0 && displayedHp == 0)
+            displayedHp = 1;
+
         UpdateHpTextInHealthbox(
             gHealthboxSpriteIds[battler],
-            HP_BOTH,
-            gBattleMons[battler].hp,
-            gBattleMons[battler].maxHP);
+            HP_CURRENT,
+            displayedHp,
+            maxHp);
     }
-    gBattlescriptCurrInstr = cmd->nextInstr;
+
+    if (!drew || pixels >= targetPixels)
+    {
+        // Final authoritative redraw ensures exact HP,
+        // including partial HP and rounding.
+        UpdateHealthboxAttribute(
+            gHealthboxSpriteIds[battler],
+            GetBattlerMon(battler),
+            HEALTHBOX_HEALTH_BAR);
+
+        if (IsOnPlayerSide(battler))
+            UpdateHpTextInHealthbox(
+                gHealthboxSpriteIds[battler],
+                HP_BOTH,
+                hp,
+                maxHp);
+
+        gBattlescriptCurrInstr = cmd->nextInstr;
+        return;
+    }
+
+    owner->breakBarFillPixels++;
 }
 
 void ReshowBreakBars(void)

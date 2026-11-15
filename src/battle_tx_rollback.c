@@ -167,9 +167,7 @@ static bool32 CanPrepareCreation(u32 caster)
         return gBattleStruct->txRollback.profile != NULL;
 
     return !(gBattleTypeFlags & BATTLE_TYPE_RECORDED)
-        && TRAINER_BATTLE_PARAM.opponentA == TRAINER_RAZELUXE
-        && (gBattlerPartyIndexes[caster] == 4
-        || (FlagGet(FLAG_CASTER_DEBUG) && gBattlerPartyIndexes[caster] == 0));
+        && TRAINER_BATTLE_PARAM.opponentA == TRAINER_RAZELUXE;
 }
 
 bool32 TxRollbackCanCreate(u32 caster)
