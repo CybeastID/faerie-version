@@ -111,5 +111,7 @@ void Test_SetPolymorphDrawSpecies(const u16 *species, u32 count); // NULL/0 rest
 // Returns the move ID for any logical slot (0-3 normal, 4-7 arcanum).
 // Returns MOVE_NONE for invalid slots or non-Castoria battlers.
 u16 CastoriaGetMoveAtSlot(u32 battler, u8 slot);
+void Script_StartCasterDebugBattle(struct ScriptContext *ctx);
+bool32 CastoriaTryCreateDebugParty(struct Pokemon *party, u16 trainerNum, bool32 firstTrainer);
 
 #endif // GUARD_CASTORIA_NAME_THEFT_H

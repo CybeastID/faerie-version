@@ -1226,6 +1226,26 @@ static inline bool32 IsBattlerAlive(enum BattlerId battler)
         return gBattleMons[battler].hp != 0 || IsBreakBarPending(battler);
 }
 
+// TX Rollback keeps the player's right slot as a dead "disabled" slot inside a
+// doubles topology. Its gBattlerPartyIndexes[] entry is stale (a copy of the
+// left slot's index at creation), so readers that ask "which party mon is my
+// partner?" must not trust it. Only the TX slot policy is consulted, so ordinary
+// doubles/multi behavior (including absent partners) is unchanged.
+static inline bool32 IsPlayerRightSlotDisabled(void)
+{
+    return TxRollbackGetSlotPolicy(GetBattlerAtPosition(B_POSITION_PLAYER_RIGHT)) == TX_SLOT_DISABLED;
+}
+
+// Party index of the partner's active mon, or PARTY_SIZE (never a valid index,
+// only ever compared against) when the partner slot is a disabled TX slot.
+static inline u32 GetPartnerPartyIndex(enum BattlerId battler)
+{
+    enum BattlerId partner = GetPartnerBattler(battler);
+    if (TxRollbackGetSlotPolicy(partner) == TX_SLOT_DISABLED)
+        return PARTY_SIZE;
+    return gBattlerPartyIndexes[partner];
+}
+
 // Some effects, like most end of turn effects only activate on active battlers (on the field)
 // IsBattlerAlive doesn't check for queued switches, so IsBattlerPresent is used in these cases
 static inline bool32 IsBattlerPresent(enum BattlerId battler)

@@ -596,7 +596,10 @@ static void CB2_InitBattleInternal(void)
         SetMainCallback2(CB2_HandleStartBattle);
 
     if (!(gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_RECORDED)))
-        KoankoTryCreateDebugSmeargleParty(gParties[B_TRAINER_OPPONENT_A], TRAINER_BATTLE_PARAM.opponentA, TRUE);
+        {
+            KoankoTryCreateDebugSmeargleParty(gParties[B_TRAINER_OPPONENT_A], TRAINER_BATTLE_PARAM.opponentA, TRUE);
+            CastoriaTryCreateDebugParty(gParties[B_TRAINER_OPPONENT_A], TRAINER_BATTLE_PARAM.opponentA, TRUE);
+        }
     TrainerBreakBarsApplyPending();
     Script_ClearTrainerBreakBarOverrides();
     Script_ClearWildBreakBarOverride();

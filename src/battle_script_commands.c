@@ -4075,7 +4075,7 @@ static void Cmd_yesnoboxlearnmove(void)
                         SetBattleMonMoveSlot(&gBattleMons[0], gMoveToLearn, movePosition);
                     }
                     if (IsDoubleBattle()
-                        && gBattlerPartyIndexes[2] == gBattleStruct->expGetterMonId
+                        && GetPartnerPartyIndex(B_BATTLER_0) == gBattleStruct->expGetterMonId
                         && MOVE_IS_PERMANENT(2, movePosition))
                     {
                         RemoveBattleMonPPBonus(&gBattleMons[2], movePosition);
@@ -4891,7 +4891,7 @@ static bool32 IsMonGettingExpSentOut(void)
 {
     if (gBattlerPartyIndexes[0] == gBattleStruct->expGetterMonId)
         return TRUE;
-    if (IsDoubleBattle() && gBattlerPartyIndexes[2] == gBattleStruct->expGetterMonId)
+    if (IsDoubleBattle() && GetPartnerPartyIndex(B_BATTLER_0) == gBattleStruct->expGetterMonId)
         return TRUE;
 
     return FALSE;
@@ -5695,7 +5695,8 @@ static void Cmd_forcerandomswitch(void)
        )
     {
         enum BattlerId battlerIn1 = gBattlerTarget;
-        enum BattlerId battlerIn2 = IsDoubleBattle() ? GetPartnerBattler(battlerIn1) : battlerIn1;
+        enum BattlerId battlerIn2 = (IsDoubleBattle() && TxRollbackGetSlotPolicy(GetPartnerBattler(battlerIn1)) != TX_SLOT_DISABLED)
+                                  ? GetPartnerBattler(battlerIn1) : battlerIn1;
         struct Pokemon *party = GetBattlerParty(battlerIn1);
 
         for (u32 slot = 0; slot < PARTY_SIZE; slot++)
@@ -9446,7 +9447,7 @@ void BS_ItemRestoreHP(void)
         // Check if the recipient is an active battler.
         if (gBattleStruct->itemPartyIndex[gBattlerAttacker] == gBattlerPartyIndexes[gBattlerAttacker])
             battler = gBattlerAttacker;
-        else if (IsDoubleBattle() && gBattleStruct->itemPartyIndex[gBattlerAttacker] == gBattlerPartyIndexes[GetPartnerBattler(gBattlerAttacker)])
+        else if (IsDoubleBattle() && gBattleStruct->itemPartyIndex[gBattlerAttacker] == GetPartnerPartyIndex(gBattlerAttacker))
             battler = GetPartnerBattler(gBattlerAttacker);
 
         // Get amount to heal.
@@ -9511,7 +9512,7 @@ void BS_ItemCureStatus(void)
         targetBattler = gBattlerAttacker;
     }
     else if (IsDoubleBattle()
-     && gBattleStruct->itemPartyIndex[gBattlerAttacker] == gBattlerPartyIndexes[GetPartnerBattler(gBattlerAttacker)])
+     && gBattleStruct->itemPartyIndex[gBattlerAttacker] == GetPartnerPartyIndex(gBattlerAttacker))
     {
         statusChanged = ItemHealMonVolatile(GetPartnerBattler(gBattlerAttacker), gLastUsedItem);
         targetBattler = GetPartnerBattler(gBattlerAttacker);
@@ -9592,7 +9593,7 @@ void BS_ItemRestorePP(void)
     if (gBattleStruct->itemPartyIndex[gBattlerAttacker] == gBattlerPartyIndexes[gBattlerAttacker])
         battler = gBattlerAttacker;
     else if (IsDoubleBattle()
-                && gBattleStruct->itemPartyIndex[gBattlerAttacker] == gBattlerPartyIndexes[GetPartnerBattler(gBattlerAttacker)])
+                && gBattleStruct->itemPartyIndex[gBattlerAttacker] == GetPartnerPartyIndex(gBattlerAttacker))
         battler = GetPartnerBattler(gBattlerAttacker);
 
     // Heal PP!

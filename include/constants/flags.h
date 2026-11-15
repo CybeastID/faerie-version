@@ -19,7 +19,7 @@
 #define FLAG_TEMP_6      (TEMP_FLAGS_START + 0x6)
 #define FLAG_HIDES_CASTER              FLAG_TEMP_5
 #define FLAG_KAZU_LEGENDARY_PUNISH     FLAG_TEMP_6 // Once per battle; cleared when Bug Space activates.
-#define FLAG_TEMP_7      (TEMP_FLAGS_START + 0x7)  // Unused Flag
+#define FLAG_CASTER_DEBUG      (TEMP_FLAGS_START + 0x7)  // Unused Flag
 #define FLAG_TEMP_8      (TEMP_FLAGS_START + 0x8)  // Unused Flag
 #define FLAG_TEMP_9      (TEMP_FLAGS_START + 0x9)  // Unused Flag
 #define FLAG_TEMP_A      (TEMP_FLAGS_START + 0xA)  // Unused Flag

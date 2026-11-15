@@ -118,5 +118,6 @@ void AIDebugTimerStart(void);
 void AIDebugTimerEnd(void);
 bool32 BattleAI_IsScoringArcanum(void);
 void SetDynamicAiFunc(AiScoreFunc func);
+s32 AI_TxArcanumScore(u32 battlerAtk, u32 battlerDef, u32 move);
 
 #endif // GUARD_BATTLE_AI_MAIN_H

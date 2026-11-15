@@ -50,6 +50,15 @@
 #include "config_changes.h"
 #include "daycare.h"
 #include "item.h"
+#include "overworld.h"
+#include "pokemon.h"
+#include "script.h"
+#include "trainer_break_bars.h"
+#include "trainer_see.h"
+#include "constants/abilities.h"
+#include "constants/moves.h"
+#include "battle_setup.h"
+
 
 #define CHOICE_STATE_INIT       0
 #define CHOICE_STATE_WAIT       1
@@ -1188,6 +1197,81 @@ u32 CalculateMonTotalThreat(struct Pokemon *mon)
     return bestSpecies;
 } */
 #endif
+
+static const struct TrainerMon sCasterDebugParty[] =
+{
+    {
+        .species = SPECIES_CASTORIA,
+        .gender = TRAINER_MON_FEMALE,
+        .heldItem = ITEM_FOCUS_SASH,
+        .ev = TRAINER_PARTY_EVS(252, 0, 0, 252, 4, 0),
+        .iv = TRAINER_PARTY_IVS(31, 31, 31, 31, 31, 31),
+        .lvl = 100,
+        .nature = NATURE_MODEST,
+        
+        // Slot 0 is the only real move; Any Move overwrites it each action. Placeholder until then.
+        .moves = {
+            MOVE_SEISMIC_TOSS,
+        },
+    }
+};
+
+static EWRAM_DATA bool8 sCasterDebugBattlePending = FALSE;
+
+bool32 CastoriaTryCreateDebugParty(struct Pokemon *party, u16 trainerNum, bool32 firstTrainer)
+{
+   if (!sCasterDebugBattlePending)
+        return FALSE;
+
+    sCasterDebugBattlePending = FALSE;
+
+    if (party != gParties[B_TRAINER_OPPONENT_A]
+     || !firstTrainer
+     || trainerNum != TRAINER_RAZELUXE
+     || gBattleTypeFlags != BATTLE_TYPE_TRAINER
+     || gBattleStruct == NULL)
+        return FALSE;
+
+    struct Trainer trainer = *GetTrainerStructFromId(TRAINER_RAZELUXE);
+
+    trainer.party = sCasterDebugParty;
+    trainer.partySize = ARRAY_COUNT(sCasterDebugParty);
+    trainer.poolSize = 0;
+    trainer.overrideTrainer = TRAINER_NONE;
+
+    CreateNPCTrainerPartyWithBreakBars(
+        party,
+        &trainer,
+        TRUE,
+        gBattleTypeFlags,
+        NULL
+    );
+    return TRUE;
+}
+
+static const u8 sDebugCasterDefeatText[] = _("Well, that was unexpected!");
+
+static void CB2_EndCasterDebugBattle(void)
+{
+    SetMainCallback2(CB2_ReturnToFieldContinueScriptPlayMapMusic);
+}
+
+void Script_StartCasterDebugBattle(struct ScriptContext *ctx)
+{
+    Script_RequestEffects(SCREFF_V1 | SCREFF_ANY);
+    memset(&gTrainerBattleParameter, 0, sizeof(gTrainerBattleParameter));
+
+    TRAINER_BATTLE_PARAM.opponentA = TRAINER_RAZELUXE;
+    TRAINER_BATTLE_PARAM.defeatTextA = (u8 *)sDebugCasterDefeatText;
+
+    gNoOfApproachingTrainers = 0;
+    gBattleTypeFlags = BATTLE_TYPE_TRAINER;
+    gIsDebugBattle = FALSE;
+    sCasterDebugBattlePending = TRUE;
+    BattleSetup_StartTrainerBattle_Debug();
+    gMain.savedCallback = CB2_EndCasterDebugBattle;
+}
+
 
 struct PolymorphCandidate
 {

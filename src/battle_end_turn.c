@@ -250,7 +250,7 @@ static bool32 IsFutureSightAttackerInParty(enum BattlerId battlerAtk, enum Battl
     if (IsDoubleBattle())
     {
         return &party[gBattleStruct->futureSight[battlerDef].partyIndex] != &party[gBattlerPartyIndexes[battlerAtk]]
-            && &party[gBattleStruct->futureSight[battlerDef].partyIndex] != &party[gBattlerPartyIndexes[GetPartnerBattler(battlerAtk)]];
+            && gBattleStruct->futureSight[battlerDef].partyIndex != GetPartnerPartyIndex(battlerAtk);
     }
 
     return &party[gBattleStruct->futureSight[battlerDef].partyIndex] != &party[gBattlerPartyIndexes[battlerAtk]];

@@ -7585,7 +7585,7 @@ static s32 AR_TxSpell(u32 a, u32 d, u32 move)
     s32 best = 0;
     /* Fixed tie order is intentional and deterministic. Restoration first. */
     const u8 wishes[] = {TX_WISH_RESTORATION, TX_WISH_REVERSAL,
-        TX_WISH_RECLAMATION, TX_WISH_CALAMITY, TX_WISH_RECIPROCITY};
+        TX_WISH_RECLAMATION, TX_WISH_CALAMITY, TX_WISH_RECIPROCITY, TX_WISH_REDUCTION};
     for (u32 i = 0; i < ARRAY_COUNT(wishes); i++)
     {
         for (u32 target = 0; target < gBattlersCount; target++)
@@ -7616,6 +7616,12 @@ static s32 AR_TxSpell(u32 a, u32 d, u32 move)
             case TX_WISH_RECIPROCITY:
                 value = HasMoveWithCategory(d, DAMAGE_CATEGORY_STATUS) ? 103 : 101;
                 break;
+            case TX_WISH_REDUCTION:
+                /* Persistent for the whole battle, so earlier is better; only nominated while
+                 * TX is not facing lethal pressure (a defensive/tempo line is worth more then).
+                 * CanWishFor already refuses it while Reduction is active. */
+                value = AR_Incoming(a) < gBattleMons[a].hp ? 113 : 0;
+                break;
             }
             if (value > best)
             {
@@ -7630,6 +7636,12 @@ static s32 AR_TxSpell(u32 a, u32 d, u32 move)
     gBattleStruct->txRollback.wishCandidate = best != 0 ? chosen : TX_WISH_NONE;
     gBattleStruct->txRollback.wishCandidateTarget = best != 0 ? recipient : MAX_BATTLERS_COUNT;
     return best;
+}
+
+/* Shared TX virtual-action scorer (Wish outcomes and Meteo) for every encounter that owns a TX. */
+s32 AI_TxArcanumScore(u32 battlerAtk, u32 battlerDef, u32 move)
+{
+    return AR_TxSpell(battlerAtk, battlerDef, move);
 }
 
 static s32 AR_CastoriaSpell(u32 a, u32 d, u32 move, s32 score)

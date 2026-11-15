@@ -16113,6 +16113,20 @@ const struct ItemInfo gItemsInfo[] =
         .iconPic = gItemIcon_ClearAmulet,
         .iconPalette = gItemIconPalette_ClearAmulet,
     },
+   /* [ITEM_BREAK_BISCUIT] =
+    {
+        .name = ITEM_NAME("Break Biscuit"),
+        .price = 5000,
+        .holdEffect = HOLD_EFFECT_BREAK_BISCUIT,
+        .description = COMPOUND_STRING("Grants an extra HP\nbar. Consumed\nwhen held."),
+        .pocket = POCKET_ITEMS,
+        .sortType = ITEM_TYPE_HELD_ITEM,
+        .type = ITEM_USE_BAG_MENU,
+        .fieldUseFunc = ItemUseOutOfBattle_CannotUse,
+        .flingPower = 30,
+        .iconPic = gItemIcon_ClearAmulet,
+        .iconPalette = gItemIconPalette_ClearAmulet,
+    },*/
 };
 
 #undef ITEM_NAME

@@ -331,7 +331,12 @@ static bool32 ComparableAttack(u32 attacker, u32 target, u32 slot)
 s32 AI_KoankoTrainer(u32 battlerAtk, u32 battlerDef, u32 move, s32 score)
 {
     if (BattleAI_IsScoringArcanum())
-        return 0; // Stage04/05 must supply the real solo profile/virtual policy.
+    {
+        // Solo TX's virtual actions (Wish outcomes, Meteo) use the shared TX policy.
+        if (IsKoankoBattle() && TxRollbackHasWishes(battlerAtk))
+            return AI_TxArcanumScore(battlerAtk, battlerDef, move);
+        return 0;
+    }
     if (!IsKoankoBattle() || GetBattlerSide(battlerAtk) != B_SIDE_OPPONENT
      || !IsBattlerAlive(battlerDef) || IsBattlerAlly(battlerAtk, battlerDef))
         return score;

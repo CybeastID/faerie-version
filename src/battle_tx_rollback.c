@@ -19,6 +19,8 @@
 #include "string_util.h"
 #include "trainer_break_bars.h"
 #include "constants/trainers.h"
+#include "constants/flags.h"
+#include "event_data.h"
 
 #define TX_PARTY_INDEX (PARTY_SIZE - 1)
 
@@ -166,7 +168,8 @@ static bool32 CanPrepareCreation(u32 caster)
 
     return !(gBattleTypeFlags & BATTLE_TYPE_RECORDED)
         && TRAINER_BATTLE_PARAM.opponentA == TRAINER_RAZELUXE
-        && gBattlerPartyIndexes[caster] == 4;
+        && (gBattlerPartyIndexes[caster] == 4
+        || (FlagGet(FLAG_CASTER_DEBUG) && gBattlerPartyIndexes[caster] == 0));
 }
 
 bool32 TxRollbackCanCreate(u32 caster)

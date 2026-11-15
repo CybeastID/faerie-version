@@ -1053,6 +1053,7 @@ enum __attribute__((packed)) Item
     ITEM_GLIMMORANITE = 873,
 
     ITEM_BREAK_CHARM,
+    // ITEM_BREAK_BISCUIT,
 
     ITEMS_COUNT,
     ITEM_FIELD_ARROW = ITEMS_COUNT,
