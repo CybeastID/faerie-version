@@ -33,10 +33,21 @@ static const struct BreakBarConfig sKoankoBossFormBar =
     .extraBars = 1,
 };
 
+// Eternatus additionally requests Zacian's arrival once the Eternamax animation and refill have finished.
+static const struct BreakBarConfig sKoankoEternatusBar =
+{
+    .phases[BREAK_BAR_PURPLE - 1] =
+    {
+        .onBreakScript = BattleScript_KoankoBossFormBreak,
+        .afterBreakScript = BattleScript_KoankoZacianArrive,
+    },
+    .extraBars = 1,
+};
+
 static const struct TrainerBreakBarRule sKoankoConjuredRules[] =
 {
     {TRAINER_BREAK_BAR_SPECIES, SPECIES_CALYREX_ICE, &sKoankoBossFormBar},
-    {TRAINER_BREAK_BAR_SPECIES, SPECIES_ETERNATUS, &sKoankoBossFormBar},
+    {TRAINER_BREAK_BAR_SPECIES, SPECIES_ETERNATUS, &sKoankoEternatusBar},
 };
 
 const struct TrainerBreakBarRules gKoankoConjuredBreakBars = TRAINER_BREAK_BAR_RULES(sKoankoConjuredRules);

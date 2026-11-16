@@ -23,6 +23,10 @@ enum TempAllyState TempAllyGetState(void);
 void TempAllySetState(enum TempAllyState state);
 bool32 TempAllyOwnsBattler(u32 battler);
 bool32 TempAllyOwnsTrainer(enum BattleTrainer trainer);
+bool32 TempAllyCanEnter(void);
+void BS_TempAllyEnter(void);
+void BS_TempAllyInitialize(void);
+void BS_TempAllyFinishEntry(void);
 // Zero every partner-row structure the ally uses. Called before it enters and after it leaves.
 void TempAllyClearStorage(void);
 
