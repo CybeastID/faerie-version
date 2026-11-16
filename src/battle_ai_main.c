@@ -7456,6 +7456,36 @@ static bool32 AR_AuthorityBlocked(u32 a, u32 d)
     return TRUE;
 }
 
+/* Mystical Fire (Castoria): 100% Sp. Atk drop on top of a modest hit. The drop is only worth
+ * choosing over her other attacks when the target can actually threaten her with special moves,
+ * the drop can land and still matters, and the hit itself is not clearly worse than her best. A
+ * secure finish is handled by AR_AttackDelta, so this adds nothing on a finishing turn. */
+static s32 AR_MysticalFire(u32 a, u32 d, u32 slot)
+{
+    u32 expected = AR_Expected(a, d, slot);
+    u32 best = AR_Best(a, d);
+    u32 special = AR_Pressure(a, MOVE_NONE, FALSE, DAMAGE_CATEGORY_SPECIAL);
+    enum Ability ability = gAiLogicData->abilities[d];
+    s32 stage = gBattleMons[d].statStages[STAT_SPATK];
+
+    if (expected == 0 || special == 0 || AR_Finish(a, d))
+        return 0;
+    if (ability == ABILITY_CONTRARY || ability == ABILITY_COMPETITIVE)
+        return -4; /* The "drop" would help the target. */
+    if (ability == ABILITY_SHIELD_DUST || DoesSubstituteBlockMove(a, d, MOVE_MYSTICAL_FIRE)
+     || !CanLowerStat(a, d, gAiLogicData, STAT_SPATK))
+        return 0; /* Just a Fire attack; ordinary scoring decides. */
+    if (expected * 100 < best * 70)
+        return 0; /* Do not trade real damage for the drop. */
+
+    s32 value = expected * 100 >= best * 85 ? 4 : 2;
+    if (special * 2 >= gBattleMons[a].hp)
+        value += 2; /* The drop is worth the most against a real special threat. */
+    if (stage <= DEFAULT_STAT_STAGE - 2)
+        value -= 3; /* Already well suppressed; Calm Mind or damage is better. */
+    return value;
+}
+
 static s32 AR_RazeMoves(u32 battlerAtk, u32 battlerDef, u32 move, s32 score)
 {
     u32 a = battlerAtk, d = battlerDef, slot = gAiThinkingStruct->movesetIndex;
@@ -7539,6 +7569,8 @@ static s32 AR_RazeMoves(u32 battlerAtk, u32 battlerDef, u32 move, s32 score)
     case SPECIES_CASTORIA:
         if (move == MOVE_CALM_MIND && useful)
             delta += AR_Setup(a, d, move, 1);
+        if (move == MOVE_MYSTICAL_FIRE && useful)
+            delta += AR_MysticalFire(a, d, slot);
         if (move == MOVE_REVIVAL_BLESSING_2 && useful)
         {   if (TxRollbackBlocksCastoriaRevivify(a))
                 return 0;

@@ -208,6 +208,76 @@ void ConjureKoankoTeam(void)
     gBattleStruct->koankoPhase = KOANKO_CONJURED_TEAM;
 }
 
+// Battle-only boss form change used by the Calyrex and Eternatus first-bar transitions.
+// Like TryBattleFormChange it records the pre-change species once and writes the form to the party
+// mon (opponent parties are rebuilt every battle), but it never touches Mega/Dynamax/Tera flags,
+// statuses, stages, volatiles or items. RecalcBattlerStats keeps current HP relative to the new max
+// HP; the Break Bar refill that follows restores the new bar to the genuine new max HP.
+static bool32 KoankoGetBossFormTarget(enum Species species, enum Species *target)
+{
+    switch (species)
+    {
+    case SPECIES_CALYREX_ICE:
+        *target = SPECIES_CALYREX_SHADOW;
+        return TRUE;
+    case SPECIES_ETERNATUS:
+        *target = SPECIES_ETERNATUS_ETERNAMAX;
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+
+static void KoankoSetBossFormMove(struct Pokemon *mon, u32 battler, u32 slot, enum Move move)
+{
+    // New moves get their standard PP once; the party copy keeps a later switch-in consistent.
+    SetMonMoveSlot(mon, move, slot);
+    gBattleMons[battler].moves[slot] = move;
+    gBattleMons[battler].pp[slot] = GetMovePP(move);
+}
+
+bool32 KoankoApplyBossForm(u32 battler)
+{
+    enum Species target;
+    struct Pokemon *mon = GetBattlerMon(battler);
+
+    if (!KoankoGetBossFormTarget(gBattleMons[battler].species, &target))
+        return FALSE;
+
+    if (GetBattlerPartyState(battler)->changedSpecies == SPECIES_NONE)
+        GetBattlerPartyState(battler)->changedSpecies = gBattleMons[battler].species;
+
+    SetMonData(mon, MON_DATA_SPECIES, &target);
+    gBattleMons[battler].species = target;
+    RecalcBattlerStats(battler, mon, FALSE);
+
+    if (target == SPECIES_CALYREX_SHADOW)
+    {
+        KoankoSetBossFormMove(mon, battler, 0, MOVE_ASTRAL_BARRAGE);
+        KoankoSetBossFormMove(mon, battler, 1, MOVE_PSYSHOCK);
+        KoankoSetBossFormMove(mon, battler, 2, MOVE_AURA_SPHERE);
+        KoankoSetBossFormMove(mon, battler, 3, MOVE_NASTY_PLOT);
+    }
+    else // Eternamax: only Dynamax Cannon becomes Eternabeam; spent PP elsewhere is preserved.
+    {
+        for (u32 i = 0; i < MAX_MON_MOVES; i++)
+        {
+            if (gBattleMons[battler].moves[i] == MOVE_DYNAMAX_CANNON)
+                KoankoSetBossFormMove(mon, battler, i, MOVE_ETERNABEAM);
+        }
+    }
+    return TRUE;
+}
+
+void BS_ApplyKoankoBossForm(void)
+{
+    NATIVE_ARGS();
+    // TryBreakBar binds gBattlerTarget to the bar owner for the duration of its phase script.
+    gBattleScripting.battler = gBattlerTarget;
+    KoankoApplyBossForm(gBattlerTarget);
+    gBattlescriptCurrInstr = cmd->nextInstr;
+}
+
 void BS_ConjureKoankoTeam(void)
 {
     NATIVE_ARGS();

@@ -120,7 +120,7 @@ TEST("Trainer Break Bar difficulty lookup inherits Normal and validates trainer 
     EXPECT_EQ(GetTrainerBreakBarRules(TRAINER_KOANKO, DIFFICULTY_COUNT), &gEmptyTrainerBreakBars);
     EXPECT_EQ(GetTrainerBreakBarRules(TRAINER_KOANKO, (enum DifficultyLevel)-1), &gEmptyTrainerBreakBars);
     EXPECT_EQ(gKoankoInitialBreakBars.count, 0);
-    EXPECT_EQ(gKoankoConjuredBreakBars.count, 0);
+    EXPECT_EQ(gKoankoConjuredBreakBars.count, 2); // Calyrex Ice Rider and Eternatus only
     EXPECT_NE(&gKoankoInitialBreakBars, &gKoankoConjuredBreakBars);
 }
 

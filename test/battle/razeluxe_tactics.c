@@ -163,3 +163,26 @@ AI_SINGLE_BATTLE_TEST("Razeluxe Tactics Castoria does not Revivify with no faint
         TURN { MOVE(player, MOVE_CELEBRATE); SCORE_GT(opponent, MOVE_EARTH_POWER, MOVE_REVIVAL_BLESSING_2); }
     }
 }
+
+// Castoria's ordinary Mystical Fire (Calm Mind / Earth Power / Moonblast / Mystical Fire set). Flash Cannon
+// stands in as a comparable-damage rival with no STAB, so the only difference is the Sp. Atk drop.
+AI_SINGLE_BATTLE_TEST("Razeluxe Tactics Castoria values Mystical Fire's Sp. Atk drop only against a special threat")
+{
+    u32 foeMove, ability;
+    bool32 dropWanted;
+    PARAMETRIZE { foeMove = MOVE_PSYCHIC; ability = ABILITY_SHADOW_TAG; dropWanted = TRUE; }
+    PARAMETRIZE { foeMove = MOVE_TACKLE;  ability = ABILITY_SHADOW_TAG; dropWanted = FALSE; }
+    PARAMETRIZE { foeMove = MOVE_PSYCHIC; ability = ABILITY_CONTRARY;   dropWanted = FALSE; }
+    gBattleTestRunnerState->data.recordedBattle.opponentA = TRAINER_RAZELUXE;
+    GIVEN {
+        AI_FLAGS(GetTrainerAIFlagsFromId(TRAINER_RAZELUXE));
+        sDynamicAiFunc = AI_RazeluxeTrainer;
+        PLAYER(SPECIES_WOBBUFFET) { Level(100); HP(1000); MaxHP(1000); Speed(1); Ability(ability); Moves(foeMove); }
+        OPPONENT(SPECIES_CASTORIA) { Level(105); Speed(1000); Moves(MOVE_MYSTICAL_FIRE, MOVE_FLASH_CANNON); }
+    } WHEN {
+        if (dropWanted)
+            TURN { MOVE(player, foeMove); SCORE_GT(opponent, MOVE_MYSTICAL_FIRE, MOVE_FLASH_CANNON); }
+        else
+            TURN { MOVE(player, foeMove); SCORE_LT(opponent, MOVE_MYSTICAL_FIRE, MOVE_FLASH_CANNON); }
+    }
+}

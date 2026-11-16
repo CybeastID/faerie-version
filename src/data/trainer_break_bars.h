@@ -25,7 +25,21 @@ const struct TrainerBreakBarRules gEmptyTrainerBreakBars = {0};
 
 // Koanko's independently exported initial and conjured team assignments.
 const struct TrainerBreakBarRules gKoankoInitialBreakBars = {0};
-const struct TrainerBreakBarRules gKoankoConjuredBreakBars = {0};
+// Conjured team: only Calyrex and Eternatus get an original bar. Each one's single extra bar breaks
+// into its boss form (one first-break transition, one final form bar); solo TX and the rest stay barless.
+static const struct BreakBarConfig sKoankoBossFormBar =
+{
+    .phases[BREAK_BAR_PURPLE - 1] = {.onBreakScript = BattleScript_KoankoBossFormBreak},
+    .extraBars = 1,
+};
+
+static const struct TrainerBreakBarRule sKoankoConjuredRules[] =
+{
+    {TRAINER_BREAK_BAR_SPECIES, SPECIES_CALYREX_ICE, &sKoankoBossFormBar},
+    {TRAINER_BREAK_BAR_SPECIES, SPECIES_ETERNATUS, &sKoankoBossFormBar},
+};
+
+const struct TrainerBreakBarRules gKoankoConjuredBreakBars = TRAINER_BREAK_BAR_RULES(sKoankoConjuredRules);
 
 // Only explicitly configured trainers need a block. Unspecified entries are NULL.
 // Missing difficulty entries inherit Normal; an explicit empty ruleset opts out.
