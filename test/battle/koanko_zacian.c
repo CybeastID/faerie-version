@@ -1,0 +1,124 @@
+#include "global.h"
+#include "test/battle.h"
+#include "battle_ai_main.h"
+#include "battle_controllers.h"
+#include "battle_gimmick.h"
+#include "battle_script_commands.h"
+#include "battle_temp_ally.h"
+#include "malloc.h"
+#include "pokemon.h"
+
+// "Koanko Zacian" patch 1: temporary-ally OWNERSHIP only (no entry, AI or departure yet).
+// AUTHORED WITHOUT A BUILD. The real player party carries canaries that must never change.
+
+static void AllySetUp(void)
+{
+    gBattleStruct = AllocZeroed(sizeof(*gBattleStruct));
+    gBattleTypeFlags = BATTLE_TYPE_DOUBLE; // not LINK, not MULTI, not INGAME_PARTNER
+    gBattlersCount = 4;
+    gBattlerPartyIndexes[0] = 0;
+    gBattlerPartyIndexes[1] = 0;
+    gBattlerPartyIndexes[2] = 0;
+    gBattlerPartyIndexes[3] = 0;
+    for (u32 i = 0; i < PARTY_SIZE; i++)
+    {
+        ZeroMonData(&gParties[B_TRAINER_PLAYER][i]);
+        ZeroMonData(&gParties[B_TRAINER_PARTNER][i]);
+    }
+}
+
+static void AllySetMon(struct Pokemon *mon, u32 species, u32 hp)
+{
+    SetMonData(mon, MON_DATA_SPECIES, &species);
+    SetMonData(mon, MON_DATA_HP, &hp);
+}
+
+static void AllyTearDown(void)
+{
+    Free(gBattleStruct);
+    gBattleStruct = NULL;
+    gBattleTypeFlags = 0;
+}
+
+TEST("Koanko Zacian ownership routes player-right to the partner row only while active")
+{
+    AllySetUp();
+    AllySetMon(&gParties[B_TRAINER_PLAYER][0], SPECIES_WOBBUFFET, 10);
+
+    // Inactive: ordinary doubles, player-right shares the real party.
+    EXPECT_EQ(GetBattlerTrainer(2), B_TRAINER_PLAYER);
+    EXPECT_EQ(GetBattlerMon(2), &gParties[B_TRAINER_PLAYER][0]);
+    EXPECT_EQ(TrainerHasParty(B_TRAINER_PARTNER), FALSE);
+
+    TempAllySetState(TEMP_ALLY_ACTIVE);
+    EXPECT_EQ(GetBattlerTrainer(0), B_TRAINER_PLAYER);
+    EXPECT_EQ(GetBattlerTrainer(1), B_TRAINER_OPPONENT_A);
+    EXPECT_EQ(GetBattlerTrainer(2), B_TRAINER_PARTNER);
+    EXPECT_EQ(GetBattlerTrainer(3), B_TRAINER_OPPONENT_A);
+    EXPECT_EQ(GetBattlerMon(0), &gParties[B_TRAINER_PLAYER][0]);
+    EXPECT_EQ(GetBattlerMon(2), &gParties[B_TRAINER_PARTNER][0]);
+    EXPECT_EQ(GetBattlerParty(2), &gParties[B_TRAINER_PARTNER][0]);
+    EXPECT_NE(GetBattlerPartyState(2), GetBattlerPartyState(0));
+    EXPECT_EQ(BattlersShareParty(0, 2), FALSE);
+    EXPECT_EQ(TrainerHasParty(B_TRAINER_PARTNER), TRUE);
+    EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_SPECIES), SPECIES_WOBBUFFET);
+    AllyTearDown();
+}
+
+TEST("Koanko Zacian ownership keeps gimmick, party state and faint counters off the player")
+{
+    AllySetUp();
+    TempAllySetState(TEMP_ALLY_ACTIVE);
+
+    SetActiveGimmick(0, GIMMICK_TERA);
+    EXPECT_EQ(GetActiveGimmick(0), GIMMICK_TERA);
+    EXPECT_EQ(GetActiveGimmick(2), GIMMICK_NONE);
+    SetActiveGimmick(2, GIMMICK_DYNAMAX);
+    EXPECT_EQ(GetActiveGimmick(0), GIMMICK_TERA);
+
+    GetBattlerPartyState(0)->sentOut = TRUE;
+    EXPECT_EQ((u32)GetBattlerPartyState(2)->sentOut, FALSE);
+
+    gBattleStruct->faintCounter[GetBattlerTrainer(2)]++;
+    EXPECT_EQ(gBattleStruct->faintCounter[B_TRAINER_PLAYER], 0);
+    EXPECT_EQ(gBattleStruct->faintCounter[B_TRAINER_PARTNER], 1);
+    AllyTearDown();
+}
+
+TEST("Koanko Zacian ownership leaves loss authority with the real player party")
+{
+    AllySetUp();
+    AllySetMon(&gParties[B_TRAINER_PLAYER][0], SPECIES_WOBBUFFET, 0);
+    AllySetMon(&gParties[B_TRAINER_PARTNER][0], SPECIES_ZACIAN_CROWNED, 100);
+    TempAllySetState(TEMP_ALLY_ACTIVE);
+
+    EXPECT_EQ(BattleSideHasTwoTrainers(B_SIDE_PLAYER), FALSE);
+    // The real party is exhausted; a surviving ally cannot sustain the encounter.
+    EXPECT_EQ(NoAliveMonsForBattlerSide(0), TRUE);
+    AllyTearDown();
+}
+
+TEST("Koanko Zacian ownership clears only the partner row")
+{
+    AllySetUp();
+    AllySetMon(&gParties[B_TRAINER_PLAYER][0], SPECIES_WOBBUFFET, 10);
+    AllySetMon(&gParties[B_TRAINER_PARTNER][0], SPECIES_ZACIAN_CROWNED, 100);
+    TempAllySetState(TEMP_ALLY_ACTIVE);
+    GetBattlerPartyState(2)->sentOut = TRUE;
+    SetActiveGimmick(2, GIMMICK_DYNAMAX);
+    gBattleStruct->partyState[B_TRAINER_PLAYER][0].timesGotHit = 3;
+
+    struct AiPartyData *saved = gAiPartyData;
+    gAiPartyData = NULL;
+    TempAllyClearStorage();
+    TempAllySetState(TEMP_ALLY_NONE);
+    gAiPartyData = saved;
+
+    EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PARTNER][0], MON_DATA_SPECIES), SPECIES_NONE);
+    EXPECT_EQ((u32)gBattleStruct->partyState[B_TRAINER_PARTNER][0].sentOut, FALSE);
+    EXPECT_EQ(gBattleStruct->gimmick.activeGimmick[B_TRAINER_PARTNER][0], GIMMICK_NONE);
+    EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_SPECIES), SPECIES_WOBBUFFET);
+    EXPECT_EQ((u32)gBattleStruct->partyState[B_TRAINER_PLAYER][0].timesGotHit, 3);
+    EXPECT_EQ(GetBattlerTrainer(2), B_TRAINER_PLAYER);
+    AllyTearDown();
+}

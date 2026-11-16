@@ -317,3 +317,21 @@ TEST("Trainer Break Bar battle-script activation preserves active stacks and cus
     Free(gBattleStruct);
     gBattleStruct = NULL;
 }
+
+SINGLE_BATTLE_TEST("CRASH DUMMY TEST")
+{
+    GIVEN 
+    {
+        PLAYER(SPECIES_WOBBUFFET);
+        OPPONENT(SPECIES_WOBBUFFET);
+    }
+    WHEN
+    {
+        TURN { MOVE(player, MOVE_TACKLE); }
+    }
+    THEN
+    {
+        EXPECT_EQ(gBattleMons[0].hp, 0);
+        EXPECT_EQ(gBattleMons[1].hp, 0);
+    }
+}

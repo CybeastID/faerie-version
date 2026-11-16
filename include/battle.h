@@ -824,6 +824,7 @@ struct BattleStruct
     struct BugSpaceData bugSpace;
     struct CastoriaBattleData castoria;
     struct TxRollbackBattleData txRollback;
+    u8 tempAllyState; // enum TempAllyState (battle_temp_ally.h): player-right AI ally owned by B_TRAINER_PARTNER.
 };
 
 struct AiBattleData

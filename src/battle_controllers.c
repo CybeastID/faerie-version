@@ -7,6 +7,7 @@
 #include "battle_anim.h"
 #include "battle_arena.h"
 #include "battle_controllers.h"
+#include "battle_temp_ally.h"
 #include "battle_gfx_sfx_util.h"
 #include "battle_interface.h"
 #include "battle_koanko_smeargle.h"
@@ -3396,6 +3397,11 @@ enum BattleTrainer GetBattlerTrainer(enum BattlerId battler)
         }
     }
 
+    // The Koanko reinforcement is owned by B_TRAINER_PARTNER without turning on MULTI, so the real
+    // player party (and every side-wide check built on BattleSideHasTwoTrainers) is unaffected.
+    if (TempAllyOwnsBattler(battler))
+        return B_TRAINER_PARTNER;
+
     return (enum BattleTrainer)(BattleSideHasTwoTrainers(battler & BIT_SIDE) ? battler : battler & BIT_SIDE);
 }
 
@@ -3419,7 +3425,7 @@ bool32 BattlersShareParty(enum BattlerId battler1, enum BattlerId battler2)
 
 bool32 TrainerHasParty(enum BattleTrainer trainer)
 {
-    return (trainer < B_TRAINER_PARTNER || BattleSideHasTwoTrainers((enum BattleSide)(trainer & BIT_SIDE)));
+    return (trainer < B_TRAINER_PARTNER || BattleSideHasTwoTrainers((enum BattleSide)(trainer & BIT_SIDE)) || TempAllyOwnsTrainer(trainer));
 }
 
 // Used for partner and opponent
