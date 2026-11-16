@@ -12828,6 +12828,12 @@ void BS_Authority(void)
 void BS_TryRevivalBlessing2(void)
 {
     NATIVE_ARGS(const u8 *failInstr);
+    if (TxRollbackBlocksCastoriaRevivify(gBattlerAttacker))
+{
+    gSelectedMonPartyId = PARTY_SIZE;
+    gBattlescriptCurrInstr = cmd->failInstr;
+    return;
+}
     u8 index = GetFirstFaintedPartyIndex(gBattlerAttacker);
 
     // Move fails if there are no battlers to revive.

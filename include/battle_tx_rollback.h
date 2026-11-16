@@ -137,5 +137,6 @@ void TxRollbackOnStatsCopied(u32 battler);
 void TxRollbackNormalizeRequest(u32 battler, u32 request, u32 monMask, void *data);
 void TxRollbackFinishBattle(void);
 void BS_TxRollbackDeteriorate(void);
+bool32 TxRollbackBlocksCastoriaRevivify(u32 battler);
 
 #endif

@@ -87,6 +87,8 @@ u32 CastoriaGetAvailableWishOutcome(u32 battler);
 void BS_CastoriaTryWish(void);
 void BS_CastoriaCancelDebilitationMoves(void);
 
+struct ScriptContext;
+
 #if TESTING
 u16 Test_GetCastoriaArcanumMove(u32 slot);
 struct PolymorphBackup
@@ -107,6 +109,8 @@ struct PolymorphSelectionDebug
 const struct PolymorphSelectionDebug *Test_GetPolymorphSelectionDebug(void);
 void Test_SetPolymorphDrawSpecies(const u16 *species, u32 count); // NULL/0 restores random draws
 #endif
+
+
 
 // Returns the move ID for any logical slot (0-3 normal, 4-7 arcanum).
 // Returns MOVE_NONE for invalid slots or non-Castoria battlers.

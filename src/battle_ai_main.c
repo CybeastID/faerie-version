@@ -7540,8 +7540,9 @@ static s32 AR_RazeMoves(u32 battlerAtk, u32 battlerDef, u32 move, s32 score)
         if (move == MOVE_CALM_MIND && useful)
             delta += AR_Setup(a, d, move, 1);
         if (move == MOVE_REVIVAL_BLESSING_2 && useful)
-        {
-            if (GetFirstFaintedPartyIndex(a) == PARTY_SIZE)
+        {   if (TxRollbackBlocksCastoriaRevivify(a))
+                return 0;
+            else if (GetFirstFaintedPartyIndex(a) == PARTY_SIZE)
                 delta -= 20;
             else if (AR_Pressure(a, move, TRUE, DAMAGE_CATEGORY_STATUS) >= gBattleMons[a].hp)
                 delta -= 12;
@@ -7649,6 +7650,8 @@ static s32 AR_CastoriaSpell(u32 a, u32 d, u32 move, s32 score)
     /* No normal-slot indexing in this function. The caller checked ownership. */
     if (move == MOVE_REVIVAL_BLESSING_2)
     {
+        if (TxRollbackBlocksCastoriaRevivify(a))
+            return 0;
         if (GetFirstFaintedPartyIndex(a) == PARTY_SIZE)
             return 0;
         if (gBattleMons[a].volatiles.perishSong)
@@ -8041,7 +8044,9 @@ s32 AI_RazeluxeTrainer (u32 battlerAtk, u32 battlerDef, u32 move, s32 score)
             }
 
             if (move == MOVE_REVIVAL_BLESSING_2) // Revivify
-            {
+            {   
+                if (TxRollbackBlocksCastoriaRevivify(battlerAtk))
+                    return 0;
                 if (GetFirstFaintedPartyIndex(battlerAtk) == PARTY_SIZE)
                     return 0;
 

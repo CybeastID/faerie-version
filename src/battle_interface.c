@@ -788,6 +788,8 @@ void SetBattleBarStruct(enum BattlerId battler, u8 healthboxSpriteId, s32 maxVal
 
 void SetHealthboxSpriteInvisible(u8 healthboxSpriteId)
 {
+    if (healthboxSpriteId >= MAX_SPRITES)
+        return;
     gSprites[healthboxSpriteId].invisible = TRUE;
     gSprites[gSprites[healthboxSpriteId].hMain_HealthBarSpriteId].invisible = TRUE;
     gSprites[gSprites[healthboxSpriteId].oam.affineParam].invisible = TRUE;
@@ -796,6 +798,8 @@ void SetHealthboxSpriteInvisible(u8 healthboxSpriteId)
 
 void SetHealthboxSpriteVisible(u8 healthboxSpriteId)
 {
+    if (healthboxSpriteId >= MAX_SPRITES)
+        return;
     gSprites[healthboxSpriteId].invisible = FALSE;
     gSprites[gSprites[healthboxSpriteId].hMain_HealthBarSpriteId].invisible = FALSE;
     gSprites[gSprites[healthboxSpriteId].oam.affineParam].invisible = FALSE;
@@ -833,6 +837,12 @@ void UpdateOamPriorityInAllHealthboxes(u8 priority, bool32 hideHPBoxes)
 {
     for (enum BattlerId i = 0; i < gBattlersCount; i++)
     {
+        // A slot with no healthbox (e.g. TX Rollback's disabled player-right slot)
+        // holds MAX_SPRITES, the shared dummy sprite. Its affineParam and data[5]
+        // are not sprite ids; using them here writes `priority` into whichever
+        // sprite those stale values happen to name (e.g. a battler sprite).
+        if (gHealthboxSpriteIds[i] >= MAX_SPRITES)
+            continue;
         u8 healthboxLeftSpriteId = gHealthboxSpriteIds[i];
         u8 healthboxRightSpriteId = gSprites[gHealthboxSpriteIds[i]].oam.affineParam;
         u8 healthbarSpriteId = gSprites[gHealthboxSpriteIds[i]].hMain_HealthBarSpriteId;

@@ -35,6 +35,7 @@ extern const u8 BattleScript_TxRollbackRefill30[];
 static const struct TxRollbackProfile sPrototypeProfile =
 {
     .ambushScript = BattleScript_TxRollbackEndurance,
+   
 };
 
 static const struct BreakBarConfig sTxBreakBars =
@@ -457,4 +458,13 @@ void BS_TxRollbackFinishAmbush(void)
     gHitMarker = (gHitMarker & ~transientHitMarkers) | (sAmbushContext.hitMarker & transientHitMarkers);
     gCurrentActionFuncId = data->savedActionFunc;
     gBattlescriptCurrInstr = cmd->nextInstr;
+}
+
+bool32 TxRollbackBlocksCastoriaRevivify(u32 battler)
+{
+    return gBattleStruct != NULL
+        && gBattleStruct->txRollback.combatProfile == TX_PROFILE_CASTORIA_SUMMON
+        && gBattleStruct->txRollback.stage >= TX_ROLLBACK_ENTERING
+        && battler == gBattleStruct->txRollback.caster
+        && gBattlerPartyIndexes[battler] == gBattleStruct->txRollback.casterPartyIndex;
 }

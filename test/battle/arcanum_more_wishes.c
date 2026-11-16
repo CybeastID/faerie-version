@@ -779,3 +779,38 @@ AI_SINGLE_BATTLE_TEST("Arcanum Wish More Wishes simultaneous player and creation
         EXPECT_EQ(TxRollbackGetSlotPolicy(3), TX_SLOT_RETIRED);
     }
 }
+
+AI_SINGLE_BATTLE_TEST("Arcanum Wish More Wishes player stat animation regression")
+{
+    GIVEN {
+        AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
+        MoreWishesFixture();
+
+        PLAYER(SPECIES_WOBBUFFET) {
+            Speed(1000);
+            Moves(MOVE_CELEBRATE, MOVE_SWORDS_DANCE, MOVE_CLOSE_COMBAT);
+        }
+
+        OPPONENT(SPECIES_CASTORIA) {
+            Speed(20);
+            Moves(MOVE_CELEBRATE);
+        }
+
+    } WHEN {
+        // Castoria summons TX.
+        TURN {
+            MOVE(player, MOVE_CELEBRATE);
+        }
+
+        // Player boosts after pseudo-doubles activation.
+        TURN {
+            MOVE(player, MOVE_CLOSE_COMBAT);
+        }
+    } SCENE {
+        MESSAGE("The wish created TX Rollback!");
+    } THEN {
+        EXPECT_EQ(gBattlersCount, 4);
+        EXPECT_EQ(gBattleStruct->txRollback.stage, TX_ROLLBACK_ACTIVE);
+        EXPECT_EQ(gBattlerSpriteIds[2], MAX_SPRITES);
+    }
+}

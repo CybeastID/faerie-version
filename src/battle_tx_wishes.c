@@ -229,9 +229,12 @@ bool32 TxRollbackCanWishFor(u32 battler, u32 wish, u32 target)
         return GetBenefits(battler, entries) != 0;
     }
     case TX_WISH_RESTORATION:
-        return IsOriginalAlly(target) && !IsBreakBarPending(target)
-            && GetBreakBarCount(target) < GetBattlerPartyState(target)->breakBarsPeak
-            && GetBreakBarCount(target) < BREAK_BAR_MAX_EXTRA_BARS;
+    return IsOriginalAlly(target)
+        && target == gBattleStruct->txRollback.caster
+        && gBattlerPartyIndexes[target] == gBattleStruct->txRollback.casterPartyIndex
+        && !IsBreakBarPending(target)
+        && GetBreakBarCount(target) < GetBattlerPartyState(target)->breakBarsPeak
+        && GetBreakBarCount(target) < BREAK_BAR_MAX_EXTRA_BARS;
     case TX_WISH_RECIPROCITY:
         return !gBattleStruct->txRollback.reciprocity;
     case TX_WISH_REDUCTION:
