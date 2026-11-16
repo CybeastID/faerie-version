@@ -774,6 +774,7 @@ extern const u8 BattleScript_InfiniteGrowthStatStart[];
 extern const u8 BattleScript_InfiniteGrowthStatUp[];
 extern const u8 BattleScript_KazuradropTransform[];
 extern const u8 BattleScript_KoankoBossFormBreak[];
+extern const u8 BattleScript_KoankoZacianArrive[];
 extern const u8 BattleScript_BugSpaceMinimize[];
 extern const u8 BattleScript_BugSpaceOHKO[];
 extern const u8 BattleScript_BugSpaceP_OHKOMessage[];

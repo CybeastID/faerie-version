@@ -946,6 +946,7 @@ const u8 *const gBattleStringsTable[STRINGID_COUNT] =
     [STRINGID_CASTORIA_WISH_NORMALITY] = COMPOUND_STRING("{B_EFF_NAME_WITH_PREFIX} returned to normal\nand became Normal type!"),
     [STRINGID_CASTORIA_WISH_MORE_WISHES] = COMPOUND_STRING("The wish created\nTX Rollback!"),
     [STRINGID_TX_ROLLBACK_AMBUSH] = COMPOUND_STRING("TX Rollback surveys\nthe battlefield!"),
+    [STRINGID_KOANKO_ZACIAN_ARRIVES] = COMPOUND_STRING("Zacian dashed in\nto fight beside you!"),
     [STRINGID_TX_WISH_REVERSAL] = COMPOUND_STRING("A wish for Reversal turned\nyour team's boosts into penalties!"),
     [STRINGID_TX_WISH_RECLAMATION] = COMPOUND_STRING("TX Rollback reclaimed\nyour team's benefits!"),
     [STRINGID_TX_WISH_CALAMITY] = COMPOUND_STRING("A wish for Calamity doomed\nyour active Pokémon!"),

@@ -1,8 +1,11 @@
 #include "global.h"
 #include "test/battle.h"
 #include "battle_ai_main.h"
+#include "battle_break_bar.h"
+#include "trainer_break_bars.h"
 #include "battle_controllers.h"
 #include "battle_gimmick.h"
+#include "battle_koanko.h"
 #include "battle_script_commands.h"
 #include "battle_temp_ally.h"
 #include "malloc.h"
@@ -121,4 +124,54 @@ TEST("Koanko Zacian ownership clears only the partner row")
     EXPECT_EQ((u32)gBattleStruct->partyState[B_TRAINER_PLAYER][0].timesGotHit, 3);
     EXPECT_EQ(GetBattlerTrainer(2), B_TRAINER_PLAYER);
     AllyTearDown();
+}
+
+extern AiScoreFunc sDynamicAiFunc;
+static bool8 sZacianSetup;
+
+static s32 ZacianArrivalSeed(u32 attacker, u32 target, u32 move, s32 score)
+{
+    if (sZacianSetup)
+    {
+        sZacianSetup = FALSE;
+        u32 battler = GetBattlerAtPosition(B_POSITION_OPPONENT_LEFT);
+        gBattleStruct->koankoPhase = KOANKO_CONJURED_TEAM;
+        const struct BreakBarConfig *config = ResolveTrainerBreakBar(&gKoankoConjuredBreakBars, gBattleMons[battler].species, 0);
+        if (config != NULL)
+            ActivateBreakBar(battler, config);
+    }
+    return score;
+}
+
+// One decision: the Eternamax bar breaks. Everything about the arrival is read afterwards.
+AI_SINGLE_BATTLE_TEST("Koanko Zacian arrives beside the player right after Eternatus's first bar breaks")
+{
+    
+    gBattleTestRunnerState->data.recordedBattle.opponentA = TRAINER_KOANKO;
+    GIVEN {
+        AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
+        sZacianSetup = TRUE;
+        sDynamicAiFunc = ZacianArrivalSeed;
+        PLAYER(SPECIES_WOBBUFFET) { Level(100); Speed(1); HP(9999); MaxHP(9999); Moves(MOVE_SEISMIC_TOSS); }
+        OPPONENT(SPECIES_ETERNATUS) { Level(103); Speed(2000); HP(1);
+            Moves(MOVE_DYNAMAX_CANNON, MOVE_FLAMETHROWER, MOVE_SLUDGE_BOMB, MOVE_RECOVER); }
+    } WHEN {
+        TURN { MOVE(player, MOVE_SEISMIC_TOSS); }
+    } THEN {
+        EXPECT_EQ(opponent->species, SPECIES_ETERNATUS_ETERNAMAX);
+        EXPECT_EQ(TempAllyGetState(), TEMP_ALLY_ACTIVE);
+        EXPECT_EQ(gBattlersCount, MAX_BATTLERS_COUNT);
+        EXPECT_EQ(gBattleMons[2].species, SPECIES_ZACIAN_CROWNED);
+        EXPECT_EQ(gBattleMons[2].level, 100);
+        EXPECT_EQ(gBattleMons[2].item, ITEM_LIFE_ORB);
+        EXPECT_EQ(gBattleMons[2].ability, ABILITY_INTREPID_SWORD);
+        EXPECT_EQ(gBattleMons[2].moves[0], MOVE_BEHEMOTH_BLADE);
+        EXPECT_EQ(gBattleMons[2].hp, gBattleMons[2].maxHP);
+        EXPECT_EQ(GetBattlerMon(2), &gParties[B_TRAINER_PARTNER][0]);
+        EXPECT_EQ(gAbsentBattlerFlags & (1u << 2), 0);
+        EXPECT(gAbsentBattlerFlags & (1u << 3));
+        // The real player party is untouched.
+        EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_SPECIES), SPECIES_WOBBUFFET);
+        EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][1], MON_DATA_SPECIES), SPECIES_NONE);
+    }
 }
