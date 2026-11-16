@@ -6566,6 +6566,14 @@ BattleScript_KazuradropTransform::
 	waitmessage B_WAIT_TIME_LONG
 	return
 
+BattleScript_KoankoBossFormBreak::
+	callnative BS_ApplyKoankoBossForm
+	handleformchange BS_SCRIPTING, 0
+	playanimation BS_SCRIPTING, B_ANIM_MEGA_EVOLUTION
+	waitanimation
+	handleformchange BS_SCRIPTING, 1
+	goto BattleScript_BreakBarRefill
+
 BattleScript_BreakBarRefill::
     callnative BS_RefillBreakBar
     healthbarupdate BS_TARGET

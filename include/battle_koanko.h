@@ -11,6 +11,8 @@ enum KoankoPhase
 bool32 TryStartKoankoConjuring(const u8 *returnInstr);
 void ConjureKoankoTeam(void);
 void BS_ConjureKoankoTeam(void);
+void BS_ApplyKoankoBossForm(void);
+bool32 KoankoApplyBossForm(u32 battler);
 void KoankoOnSwitchIn(u32 battler);
 s32 AI_KoankoTrainer(u32 battlerAtk, u32 battlerDef, u32 move, s32 score);
 void KoankoSetupTrainerAi(void);
