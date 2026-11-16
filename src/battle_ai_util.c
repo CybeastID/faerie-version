@@ -1852,8 +1852,8 @@ enum Ability AI_DecideKnownAbilityForTurn(enum BattlerId battlerId)
     if (knownAbility == ABILITY_NONE)
         return knownAbility;
 
-    if (gAiPartyData->mons[GetBattlerSide(battlerId)][gBattlerPartyIndexes[battlerId]].ability != ABILITY_NONE)
-        return gAiPartyData->mons[GetBattlerSide(battlerId)][gBattlerPartyIndexes[battlerId]].ability;
+    if (gAiPartyData->mons[GetBattlerTrainer(battlerId)][gBattlerPartyIndexes[battlerId]].ability != ABILITY_NONE)
+        return gAiPartyData->mons[GetBattlerTrainer(battlerId)][gBattlerPartyIndexes[battlerId]].ability;
 
     // Abilities that prevent fleeing - treat as always known
     if (knownAbility == ABILITY_SHADOW_TAG || knownAbility == ABILITY_MAGNET_PULL || knownAbility == ABILITY_ARENA_TRAP)
@@ -1886,7 +1886,7 @@ enum HoldEffect AI_DecideHoldEffectForTurn(enum BattlerId battlerId)
         return holdEffect;
 
     if (!IsAiBattlerAware(battlerId) && !IsAiFlagPresent(AI_FLAG_ITEM_OMNISCIENCE))
-        holdEffect = gAiPartyData->mons[GetBattlerSide(battlerId)][gBattlerPartyIndexes[battlerId]].heldEffect;
+        holdEffect = gAiPartyData->mons[GetBattlerTrainer(battlerId)][gBattlerPartyIndexes[battlerId]].heldEffect;
     else
         holdEffect = GetBattlerHoldEffectIgnoreNegation(battlerId);
 

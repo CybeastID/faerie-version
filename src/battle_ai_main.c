@@ -730,7 +730,7 @@ void Ai_UpdateSwitchInData(enum BattlerId battler)
 
 void Ai_UpdateFaintData(enum BattlerId battler)
 {
-    struct AiPartyMon *aiMon = &gAiPartyData->mons[GetBattlerSide(battler)][gBattlerPartyIndexes[battler]];
+    struct AiPartyMon *aiMon = &gAiPartyData->mons[GetBattlerTrainer(battler)][gBattlerPartyIndexes[battler]];
     ClearBattlerMoveHistory(battler);
     ClearBattlerAbilityHistory(battler);
     ClearBattlerItemEffectHistory(battler);
