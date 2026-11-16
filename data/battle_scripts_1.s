@@ -6574,6 +6574,22 @@ BattleScript_KoankoBossFormBreak::
 	handleformchange BS_SCRIPTING, 1
 	goto BattleScript_BreakBarRefill
 
+BattleScript_KoankoZacianArrive::
+    callnative BS_TempAllyEnter
+    .4byte BattleScript_KoankoZacianArriveEnd
+    waitstate
+    switchindataupdate BS_SCRIPTING
+    callnative BS_TempAllyInitialize
+    printstring STRINGID_KOANKO_ZACIAN_ARRIVES
+    waitmessage B_WAIT_TIME_LONG
+    switchinanim BS_SCRIPTING, FALSE, FALSE
+    waitstate
+    switchineffects BS_SCRIPTING
+    switchinevents
+    callnative BS_TempAllyFinishEntry
+BattleScript_KoankoZacianArriveEnd:
+    return
+
 BattleScript_BreakBarRefill::
     callnative BS_RefillBreakBar
     healthbarupdate BS_TARGET
