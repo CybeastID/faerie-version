@@ -3,6 +3,8 @@
 
 #include "global.h"
 
+bool32 TxRollbackSummonFormationActive(void);
+
 enum TxRollbackStage
 {
     TX_ROLLBACK_NONE,

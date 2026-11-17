@@ -778,8 +778,10 @@ struct BattleTrialData
 struct BattleTestData
 {
     bool8 hasSummonedOpponent;
+    bool8 hasSummonedAlly;
     bool8 hasAfterCleanup;
     struct Pokemon summonedOpponentMon;
+    struct Pokemon summonedAllyMon;
     u8 partySizes[MAX_BATTLE_TRAINERS];
     u8 explicitMoves[MAX_BATTLE_TRAINERS];
     bool8 hasExplicitSpeeds;
@@ -1020,6 +1022,8 @@ struct moveWithPP {
 
 #define SUMMONED_OPPONENT() DeclareSummonedOpponent(__LINE__)
 void DeclareSummonedOpponent(u32 sourceLine);
+#define SUMMONED_ALLY() DeclareSummonedAlly(__LINE__)
+void DeclareSummonedAlly(u32 sourceLine);
 
 #define RNGSeed(seed) RNGSeed_(__LINE__, seed)
 #define AI_FLAGS(flags) AIFlags_(__LINE__, flags)

@@ -6591,6 +6591,11 @@ BattleScript_KoankoZacianArrive::
 BattleScript_KoankoZacianArriveEnd:
     return
 
+BattleScript_KoankoZacianDepart::
+    waitstate
+    callnative BS_TempAllyDepart
+    end
+
 BattleScript_BreakBarRefill::
     callnative BS_RefillBreakBar
     healthbarupdate BS_TARGET

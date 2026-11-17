@@ -4,6 +4,7 @@
 #include "battle_ai_util.h"
 #include "battle_koanko.h"
 #include "battle_koanko_smeargle.h"
+#include "battle_temp_ally.h"
 #include "battle_setup.h"
 #include "battle_gimmick.h"
 #include "battle_dynamax.h"
@@ -330,6 +331,25 @@ static bool32 ComparableAttack(u32 attacker, u32 target, u32 slot)
 // its own block; shared helpers keep cache/legality arithmetic in one place.
 s32 AI_KoankoTrainer(u32 battlerAtk, u32 battlerDef, u32 move, s32 score)
 {
+    if (TempAllyOwnsBattler(battlerAtk) && !BattleAI_IsScoringArcanum())
+    {
+        if (score <= 0 || !IsBattlerAlive(battlerDef) || IsBattlerAlly(battlerAtk, battlerDef))
+            return 0;
+        bool32 beforeMove;
+        bool32 threatened = ThreatensKo(battlerAtk, battlerDef, move, &beforeMove);
+        if (move == MOVE_SWORDS_DANCE)
+        {
+            // One setup is worthwhile only against a healthy wall that cannot
+            // KO us. Intrepid Sword already supplies the initial +1; at +3
+            // pressure wins. PP/status/Encore legality stays in normal AI.
+            if (gBattleMons[battlerAtk].statStages[STAT_ATK] >= DEFAULT_STAT_STAGE + 3
+             || threatened || HasSecureKo(battlerAtk, battlerDef)
+             || BestExpectedDamage(battlerAtk, battlerDef) >= gBattleMons[battlerDef].hp / 4)
+                return 1;
+            return score >= AI_SCORE_DEFAULT ? 90 : 1;
+        }
+        return RankDamage(battlerAtk, battlerDef, move, score, beforeMove);
+    }
     if (BattleAI_IsScoringArcanum())
     {
         // Solo TX's virtual actions (Wish outcomes, Meteo) use the shared TX policy.

@@ -1,6 +1,11 @@
 # Stage 07 — Independent AI Zacian reinforcement and return to singles
 
-Status: **fully planned**; largest integration stage, tuning choices recorded below. Snapshot: `mypatch`, 2026-11-09.
+Status: **implemented on `PreS5Cd`; final focused headless validation passes;
+graphical acceptance reserved for the user**. Full regression retains failures
+also reproduced at the starting commit; see the implementation record.
+This older design snapshot (`mypatch`, 2026-11-09) is retained as planning history.
+Current tuning, approved anti-Eternamax rule, lifecycle and actual validation
+status: [Stage 07 implementation](../../../mechanics/temporary_ally.md).
 
 ## 1. Objective and scope
 

@@ -2,6 +2,7 @@
 #define GUARD_BATTLE_TEMP_ALLY_H
 
 #include "constants/battle.h"
+#include "battle_tx_rollback.h"
 
 // Koanko's temporary AI reinforcement (Zacian-Crowned), always battler 2 (player-right).
 // It is owned by B_TRAINER_PARTNER: GetBattlerTrainer() routes party, PartyState, AI party data, gimmick
@@ -24,6 +25,11 @@ void TempAllySetState(enum TempAllyState state);
 bool32 TempAllyOwnsBattler(u32 battler);
 bool32 TempAllyOwnsTrainer(enum BattleTrainer trainer);
 bool32 TempAllyCanEnter(void);
+enum TxRollbackSlotPolicy TempAllyGetSlotPolicy(u32 battler);
+void TempAllyOnFaint(u32 battler);
+bool32 TempAllyTryDeparture(void);
+void BS_TempAllyDepart(void);
+void TempAllyFinishBattle(void);
 void BS_TempAllyEnter(void);
 void BS_TempAllyInitialize(void);
 void BS_TempAllySlideBattlers(void);

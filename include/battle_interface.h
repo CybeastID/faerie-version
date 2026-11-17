@@ -140,6 +140,7 @@ void DummyBattleInterfaceFunc(u8 healthboxSpriteId, bool8 isDoubleBattleBattlerO
 void UpdateOamPriorityInAllHealthboxes(u8 priority, bool32 hideHpBoxes);
 void InitBattlerHealthboxCoords(enum BattlerId battler);
 void RebuildBattlerHealthbox(enum BattlerId battler);
+void DestroyBattlerHealthbox(enum BattlerId battler);
 void GetBattlerHealthboxCoords(enum BattlerId battler, s16 *x, s16 *y);
 void UpdateHpTextInHealthbox(u32 healthboxSpriteId, u32 maxOrCurrent, s16 currHp, s16 maxHp);
 void SwapHpBarsWithHpText(void);

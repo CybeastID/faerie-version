@@ -230,32 +230,19 @@ converted Judgment typing and the exact Bug Space presentation with real Multity
 The block can consume corrected caches when those mechanics exist; it does not
 fabricate their execution or change Arceus's ability.
 
-## Zacian: where its AI belongs
+## Zacian: independent ally dispatch (Stage 07)
 
-**The single encounter callback can dispatch Zacian's tactics, but the current
-opponent-only route is not yet a safe Zacian controller.** Recommended Stage07
-integration: recognize the explicit temporary ally owner before the opponent-side
-guard, then delegate to a separate `AI_KoankoZacian` helper in this module. Keep
-Koanko's enemy roster switch separate. This proposed helper is not implemented or
-registered by species alone in this change.
+`AI_KoankoTrainer` now recognizes the explicit temporary ally owner before the
+opponent-only roster guard. Ordinary player-side Zacian does not acquire this
+policy by species. Cached reachable damage/KO pressure drives its legal attacks;
+Swords Dance is suppressed at +3 Attack, under a lethal threat, or when direct
+pressure is already useful. No fixed move rotation is used.
 
-The missing requirements are concrete:
-
-- `battle_ai_util.c:BattlerHasAi` recognizes player-right for INGAME_PARTNER or
-  AI-vs-AI, not the proposed DOUBLE-only independent formation. Installing a
-  player-partner controller alone does not make `ComputeBattlerDecisions` score it.
-- `PlayerPartnerHandleChooseMove` can consume the resulting cached move/target, so
-  it is a useful execution path once ownership is correctly routed.
-- `PlayerPartnerHandleChooseAction` calls `AI_TrySwitchOrUseItem`; those paths,
-  ChoosePokemon, and gimmick commitment need independent-ally gating outside a
-  move-scoring callback. Do not enable INGAME_PARTNER/MULTI as a shortcut.
-- Current party/history/gimmick storage indexes real player side/party slots.
-  Stage07 must supply independent owner storage and route these accesses, retire
-  the actor safely, and preserve player-left commands/resources/loss authority.
-- Attack/setup policy can then prefer real useful pressure, suppress redundant
-  Swords Dance, and use the approved Behemoth-versus-Eternamax rule identically in
-  scoring and execution. The tuning/damage rule and owner lifecycle are not
-  invented here.
+The player-partner controller is recognized by `battle_controllers.c:BattlerHasAi`
+without MULTI/INGAME_PARTNER. Its ally-specific action gate allows only attacks;
+normal cached move/target selection remains. Separate owner routing, switch/item/
+gimmick exclusions, final-faint departure and the approved anti-Eternamax power
+rule are documented in [the Stage 07 implementation](temporary_ally.md).
 
 The ownership regression explicitly proves that an ordinary player-side Zacian
 does not acquire this boss policy just by sharing its species.

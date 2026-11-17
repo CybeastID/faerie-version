@@ -7524,7 +7524,8 @@ static u8 GetPartyLayoutFromBattleType(void)
         return PARTY_LAYOUT_MULTI;
     if (IsMultiBattle() == TRUE && AreMultiPartiesFullTeams())
         return PARTY_LAYOUT_MULTI_FULL;
-    if (!IsDoubleBattle() || gPartiesCount[B_TRAINER_PLAYER] == 1 || IsPlayerRightSlotDisabled()) // Draw the single layout in a double battle where the player has only one Pokémon.
+    if (!IsDoubleBattle() || gPartiesCount[B_TRAINER_PLAYER] == 1 || IsPlayerRightSlotDisabled()
+     || !BattlersShareParty(GetBattlerAtPosition(B_POSITION_PLAYER_LEFT), GetBattlerAtPosition(B_POSITION_PLAYER_RIGHT)))
         return PARTY_LAYOUT_SINGLE;
     return PARTY_LAYOUT_DOUBLE;
 }
@@ -7673,7 +7674,8 @@ static void BufferBattlePartyOrder(u8 *partyBattleOrder, u8 flankId)
         }
         return;
     }
-    else if (IsDoubleBattle() == FALSE || IsPlayerRightSlotDisabled())
+    else if (IsDoubleBattle() == FALSE || IsPlayerRightSlotDisabled()
+          || !BattlersShareParty(GetBattlerAtPosition(B_POSITION_PLAYER_LEFT), GetBattlerAtPosition(B_POSITION_PLAYER_RIGHT)))
     {
         j = 1;
         partyIds[0] = gBattlerPartyIndexes[GetBattlerAtPosition(B_POSITION_PLAYER_LEFT)];
@@ -7744,7 +7746,9 @@ static void BufferBattlePartyOrderBySide(u8 *partyBattleOrder, u8 flankId, enum 
         }
         return;
     }
-    else if (IsDoubleBattle() == FALSE || (IsOnPlayerSide(battler) && IsPlayerRightSlotDisabled()))
+    else if (IsDoubleBattle() == FALSE || !BattlersShareParty(battler, GetPartnerBattler(battler))
+          || TxRollbackGetSlotPolicy(GetPartnerBattler(battler)) == TX_SLOT_DISABLED
+          || TxRollbackGetSlotPolicy(GetPartnerBattler(battler)) == TX_SLOT_RETIRED)
     {
         j = 1;
         partyIndexes[0] = gBattlerPartyIndexes[leftBattler];

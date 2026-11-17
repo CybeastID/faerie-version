@@ -9,6 +9,7 @@
 #include "battle_setup.h"
 #include "battle_tower.h"
 #include "battle_z_move.h"
+#include "battle_temp_ally.h"
 #include "bg.h"
 #include "data.h"
 #include "frontier_util.h"
@@ -268,7 +269,10 @@ static void PlayerPartnerHandleTrainerSlideBack(enum BattlerId battler)
 
 static void PlayerPartnerHandleChooseAction(enum BattlerId battler)
 {
-    AI_TrySwitchOrUseItem(battler);
+    if (TempAllyOwnsBattler(battler))
+        BtlController_EmitTwoReturnValues(battler, B_COMM_TO_ENGINE, B_ACTION_USE_MOVE, GetBattlerAtPosition(B_POSITION_OPPONENT_LEFT) << 8);
+    else
+        AI_TrySwitchOrUseItem(battler);
     BtlController_Complete(battler);
 }
 
@@ -281,6 +285,12 @@ static void PlayerPartnerHandleChooseMove(enum BattlerId battler)
 static void PlayerPartnerHandleChoosePokemon(enum BattlerId battler)
 {
     s32 chosenMonId;
+    if (TempAllyOwnsBattler(battler))
+    {
+        BtlController_EmitChosenMonReturnValue(battler, B_COMM_TO_ENGINE, PARTY_SIZE, NULL);
+        BtlController_Complete(battler);
+        return;
+    }
     // Choosing Revival Blessing target
     if (gBattleResources->bufferA[battler][1] == PARTY_ACTION_CHOOSE_FAINTED_MON)
     {

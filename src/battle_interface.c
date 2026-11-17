@@ -607,13 +607,17 @@ static const union TextColor sHealthBoxTextColor =
 
 // This function is here to cover a specific case - one player's mon in a 2 vs 1 double battle. In this scenario - display singles layout.
 // The same goes for a 2 vs 1 where opponent has only one Pokémon.
+// A formation-disabled right position also leaves that side centered, even
+// when the trainer has reserves. Animations and menu reshow share this policy.
 enum BattleCoordTypes GetBattlerCoordsIndex(enum BattlerId battler)
 {
     if (GetBattlerPosition(battler) == B_POSITION_PLAYER_LEFT
      && (gPartiesCount[B_TRAINER_PLAYER] == 1 || TxRollbackGetSlotPolicy(GetBattlerAtPosition(B_POSITION_PLAYER_RIGHT)) == TX_SLOT_DISABLED) && !(gBattleTypeFlags & BATTLE_TYPE_MULTI)
      && TempAllyGetState() == TEMP_ALLY_NONE) // Koanko's temporary ally (partner row) makes the player's slot doubles
         return BATTLE_COORDS_SINGLES;
-    else if (GetBattlerPosition(battler) == B_POSITION_OPPONENT_LEFT && gPartiesCount[B_TRAINER_OPPONENT_A] == 1 && !(gBattleTypeFlags & BATTLE_TYPE_TWO_OPPONENTS))
+    else if (GetBattlerPosition(battler) == B_POSITION_OPPONENT_LEFT
+     && (gPartiesCount[B_TRAINER_OPPONENT_A] == 1 || TxRollbackGetSlotPolicy(GetBattlerAtPosition(B_POSITION_OPPONENT_RIGHT)) == TX_SLOT_DISABLED)
+     && !(gBattleTypeFlags & BATTLE_TYPE_TWO_OPPONENTS))
         return BATTLE_COORDS_SINGLES;
     else if (IsDoubleBattle())
         return BATTLE_COORDS_DOUBLES;
@@ -896,6 +900,18 @@ void InitBattlerHealthboxCoords(enum BattlerId battler)
 // Rebuilds a battler's healthbox for the layout it uses now. A box is created from the singles or doubles
 // sprite template (shape, right-half tile offset and health-bar sprite all differ on the player side), so
 // moving an existing singles box to doubles coordinates cannot convert it. Visibility is preserved.
+void DestroyBattlerHealthbox(enum BattlerId battler)
+{
+    u32 left = gHealthboxSpriteIds[battler];
+    if (left >= MAX_SPRITES)
+        return;
+    DestroyIndicatorSprite(battler);
+    DestroySprite(&gSprites[gSprites[left].hMain_HealthBarSpriteId]);
+    DestroySprite(&gSprites[gSprites[left].oam.affineParam]);
+    DestroySprite(&gSprites[left]);
+    gHealthboxSpriteIds[battler] = MAX_SPRITES;
+}
+
 void RebuildBattlerHealthbox(enum BattlerId battler)
 {
     u8 oldLeft = gHealthboxSpriteIds[battler];
@@ -907,10 +923,7 @@ void RebuildBattlerHealthbox(enum BattlerId battler)
         return;
 
     visible = !gSprites[oldLeft].invisible;
-    DestroyIndicatorSprite(battler);
-    DestroySprite(&gSprites[gSprites[oldLeft].hMain_HealthBarSpriteId]);
-    DestroySprite(&gSprites[gSprites[oldLeft].oam.affineParam]);
-    DestroySprite(&gSprites[oldLeft]);
+    DestroyBattlerHealthbox(battler);
 
     gHealthboxSpriteIds[battler] = CreateBattlerHealthboxSprites(battler);
     // Creation resets the shared last-used-ball and move-info sprite ids; this rebuild must not disturb them.
@@ -2986,7 +2999,7 @@ static void Task_FreeAbilityPopUpGfx(u8 taskId)
 {
     if (!IsAnyAbilityPopUpActive())
     {
-        for (enum BattlerId battler = 0; battler < gBattlersCount; battler++)
+        for (enum BattlerId battler = 0; battler < MAX_BATTLERS_COUNT; battler++)
         {
             if (IndexOfSpriteTileTag(TAG_ABILITY_POP_UP_PLAYER1 + battler) != 0xFF)
                 FreeSpriteTilesByTag(TAG_ABILITY_POP_UP_PLAYER1 + battler);

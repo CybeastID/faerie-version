@@ -1,5 +1,6 @@
 #include "global.h"
 #include "battle.h"
+#include "battle_temp_ally.h"
 #include "battle_anim.h"
 #include "battle_ai_main.h"
 #include "battle_ai_record.h"
@@ -3077,6 +3078,7 @@ void SwitchInClearSetData(enum BattlerId battler, struct Volatiles *volatilesCop
 void FaintClearSetData(enum BattlerId battler)
 {
     ReductionResetOccupant(battler);
+    TempAllyOnFaint(battler);
     TxRollbackOnFaint(battler);
     gBattleStruct->battlerState[battler].noOrderChange = FALSE;
     // Data cleared both on switch and faint
@@ -3817,7 +3819,7 @@ void SwitchPartyOrder(enum BattlerId battler)
     else if (gBattleStruct->battlerState[battler].originalBattlerPartyId == partyId2)
         gBattleStruct->battlerState[battler].originalBattlerPartyId = partyId1;
 
-    if (IsDoubleBattle())
+    if (IsDoubleBattle() && !TempAllyOwnsBattler(battler) && !TempAllyOwnsBattler(GetPartnerBattler(battler)))
     {
         for (i = 0; i < (int)ARRAY_COUNT(gBattlePartyCurrentOrder); i++)
         {
@@ -5500,6 +5502,7 @@ static void HandleEndTurn_FinishBattle(void)
 
         ReductionFinishBattle();
         TxRollbackFinishBattle();
+        TempAllyFinishBattle();
         for (enum BattlerId battler = 0; battler < gBattlersCount; battler++)
             if (GetActiveGimmick(battler) == GIMMICK_DYNAMAX)
                 UndoDynamax(battler);
@@ -5529,6 +5532,7 @@ static void HandleEndTurn_FinishBattle(void)
 void Test_RestorePlayerBattleStats(void)
 {
     ReductionFinishBattle();
+    TempAllyFinishBattle();
     for (u32 battler = 0; battler < gBattlersCount; battler++)
         if (GetActiveGimmick(battler) == GIMMICK_DYNAMAX)
             UndoDynamax(battler);

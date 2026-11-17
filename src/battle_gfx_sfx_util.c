@@ -825,6 +825,16 @@ void LoadBattleBarGfx(u8 unused)
     DecompressDataWithHeaderWram(gBattleInterfaceGfx_BattleBar, gMonSpritesGfxPtr->barFontGfx);
 }
 
+void BattleRestoreSinglesHealthboxGfx(void)
+{
+    // A menu reshow may have allocated only the smaller doubles frames. Never
+    // decompress a singles frame over those allocations and their neighbours.
+    FreeSpriteTilesByTag(TAG_HEALTHBOX_PLAYER1_TILE);
+    FreeSpriteTilesByTag(TAG_HEALTHBOX_OPPONENT1_TILE);
+    LoadCompressedSpriteSheet(&sSpriteSheet_SinglesPlayerHealthbox);
+    LoadCompressedSpriteSheet(B_HP_PERCENTAGE_DISPLAY ? &sSpriteSheet_SinglesOpponentLargeHealthbox : &sSpriteSheet_SinglesOpponentHealthbox);
+}
+
 bool8 BattleInitAllSprites(u8 *state1, u8 *battler)
 {
     bool8 retVal = FALSE;
@@ -1167,7 +1177,7 @@ void SetBattlerSpriteAffineMode(u8 affineMode)
 
 void CreateEnemyShadowSprite(enum BattlerId battler)
 {
-    if (TxRollbackGetSlotPolicy(battler) == TX_SLOT_RETIRED)
+    if (TxRollbackGetSlotPolicy(battler) == TX_SLOT_RETIRED || TxRollbackGetSlotPolicy(battler) == TX_SLOT_DISABLED)
         return;
     if (B_ENEMY_MON_SHADOW_STYLE >= GEN_4 && P_GBA_STYLE_SPECIES_GFX == FALSE)
     {

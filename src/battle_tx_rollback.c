@@ -9,6 +9,7 @@
 #include "battle_gfx_sfx_util.h"
 #include "battle_interface.h"
 #include "battle_koanko.h"
+#include "battle_temp_ally.h"
 #include "battle_main.h"
 #include "battle_script_commands.h"
 #include "battle_setup.h"
@@ -68,7 +69,7 @@ static void ResumeAmbushAfterEffects(void)
     gBattleMainFunc = RunBattleScriptCommands;
 }
 
-static bool32 FormationActive(void)
+bool32 TxRollbackSummonFormationActive(void)
 {
     return gBattleStruct != NULL
         && gBattleStruct->txRollback.combatProfile == TX_PROFILE_CASTORIA_SUMMON
@@ -77,7 +78,9 @@ static bool32 FormationActive(void)
 
 enum TxRollbackSlotPolicy TxRollbackGetSlotPolicy(u32 battler)
 {
-    if (!FormationActive() || battler >= gBattlersCount)
+    if (gBattleStruct != NULL && gBattleStruct->tempAllyState != TEMP_ALLY_NONE)
+        return TempAllyGetSlotPolicy(battler);
+    if (!TxRollbackSummonFormationActive() || battler >= gBattlersCount)
         return TX_SLOT_NORMAL;
     if (GetBattlerPosition(battler) == B_POSITION_PLAYER_RIGHT)
         return TX_SLOT_DISABLED;
@@ -148,7 +151,7 @@ void TxRollbackRegisterKoanko(u32 battler)
 
 bool32 TxRollbackCanRevive(enum BattleTrainer trainer, u32 partyIndex)
 {
-    return !TxRollbackIsSummonedPartyMon(trainer, partyIndex);
+    return !TempAllyOwnsTrainer(trainer) && !TxRollbackIsSummonedPartyMon(trainer, partyIndex);
 }
 
 static bool32 CanPrepareCreation(u32 caster)

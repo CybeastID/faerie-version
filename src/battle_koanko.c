@@ -278,6 +278,19 @@ void BS_ApplyKoankoBossForm(void)
     gBattlescriptCurrInstr = cmd->nextInstr;
 }
 
+// Shared by real damage and AI simulation. This is an encounter rule, not Dynamax.
+bool32 KoankoIsEternamaxTarget(u32 battler)
+{
+    return gBattleStruct != NULL
+        && (gBattleTypeFlags & BATTLE_TYPE_TRAINER)
+        && !(gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_FRONTIER | BATTLE_TYPE_TWO_OPPONENTS))
+        && TRAINER_BATTLE_PARAM.opponentA == TRAINER_KOANKO
+        && gBattleStruct->koankoPhase == KOANKO_CONJURED_TEAM
+        && GetBattlerPosition(battler) == B_POSITION_OPPONENT_LEFT
+        && gBattleMons[battler].species == SPECIES_ETERNATUS_ETERNAMAX
+        && !gBattleMons[battler].volatiles.transformed;
+}
+
 void BS_ConjureKoankoTeam(void)
 {
     NATIVE_ARGS();

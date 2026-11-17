@@ -1,5 +1,6 @@
 #include "global.h"
 #include "battle.h"
+#include "battle_temp_ally.h"
 #include "battle_anim.h"
 #include "battle_controllers.h"
 #include "malloc.h"
@@ -82,6 +83,7 @@ void AllocateBattleResources(void)
 
 void FreeBattleResources(void)
 {
+    TempAllyFinishBattle();
     TrainerBreakBarsClearPending();
     Script_ClearTrainerBreakBarOverrides();
     Script_ClearWildBreakBarOverride();
