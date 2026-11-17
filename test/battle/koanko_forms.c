@@ -98,6 +98,8 @@ AI_SINGLE_BATTLE_TEST("Koanko Calyrex form change keeps stat stages")
     }
 }
 
+// No healing move in the fixture kit: with every move tied the AI picks at random, and a Recover at 1 HP would
+// lift Eternatus above the Seismic Toss that is meant to break its bar.
 AI_SINGLE_BATTLE_TEST("Koanko Eternatus first original bar becomes genuine Eternamax with Eternabeam")
 {
     gBattleTestRunnerState->data.recordedBattle.opponentA = TRAINER_KOANKO;
@@ -108,7 +110,7 @@ AI_SINGLE_BATTLE_TEST("Koanko Eternatus first original bar becomes genuine Etern
         sDynamicAiFunc = KoankoFormsSeed;
         PLAYER(SPECIES_WOBBUFFET) { Level(100); Speed(1); HP(9999); MaxHP(9999); Moves(MOVE_SEISMIC_TOSS); }
         OPPONENT(SPECIES_ETERNATUS) { Level(103); Speed(2000); HP(1);
-            Moves(MOVE_DYNAMAX_CANNON, MOVE_FLAMETHROWER, MOVE_SLUDGE_BOMB, MOVE_RECOVER); }
+            Moves(MOVE_DYNAMAX_CANNON, MOVE_FLAMETHROWER, MOVE_SLUDGE_BOMB, MOVE_CELEBRATE); }
     } WHEN {
         TURN { MOVE(player, MOVE_SEISMIC_TOSS); }
     } THEN {
@@ -117,7 +119,7 @@ AI_SINGLE_BATTLE_TEST("Koanko Eternatus first original bar becomes genuine Etern
         EXPECT_EQ(opponent->moves[0], MOVE_ETERNABEAM);
         EXPECT_EQ(opponent->moves[1], MOVE_FLAMETHROWER);
         EXPECT_EQ(opponent->moves[2], MOVE_SLUDGE_BOMB);
-        EXPECT_EQ(opponent->moves[3], MOVE_RECOVER);
+        EXPECT_EQ(opponent->moves[3], MOVE_CELEBRATE);
         EXPECT_EQ(opponent->hp, opponent->maxHP);
         EXPECT_EQ(GetBreakBarCount(GetBattlerAtPosition(B_POSITION_OPPONENT_LEFT)), 0);
         EXPECT_EQ(gBattleResults.opponentFaintCounter, 0);

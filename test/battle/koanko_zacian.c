@@ -154,7 +154,7 @@ AI_SINGLE_BATTLE_TEST("Koanko Zacian arrives beside the player right after Etern
         sDynamicAiFunc = ZacianArrivalSeed;
         PLAYER(SPECIES_WOBBUFFET) { Level(100); Speed(1); HP(9999); MaxHP(9999); Moves(MOVE_SEISMIC_TOSS); }
         OPPONENT(SPECIES_ETERNATUS) { Level(103); Speed(2000); HP(1);
-            Moves(MOVE_DYNAMAX_CANNON, MOVE_FLAMETHROWER, MOVE_SLUDGE_BOMB, MOVE_RECOVER); }
+            Moves(MOVE_DYNAMAX_CANNON, MOVE_FLAMETHROWER, MOVE_SLUDGE_BOMB, MOVE_CELEBRATE); }
     } WHEN {
         TURN { MOVE(player, MOVE_SEISMIC_TOSS); }
     } THEN {

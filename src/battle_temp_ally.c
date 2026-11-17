@@ -87,14 +87,23 @@ bool32 TempAllyCanEnter(void)
     for (u32 i = 0; i < MAX_SPRITES; i++)
         freeSprites += !gSprites[i].inUse;
 
-    return gBattleStruct != NULL
-        && TempAllyGetState() == TEMP_ALLY_NONE
-        && gBattleStruct->koankoPhase == KOANKO_CONJURED_TEAM
-        && gBattleStruct->txRollback.combatProfile == TX_PROFILE_NONE
-        && !(gBattleTypeFlags & (BATTLE_TYPE_RECORDED | BATTLE_TYPE_DOUBLE | BATTLE_TYPE_MULTI | BATTLE_TYPE_LINK))
-        && gBattlersCount == 2
-        && TRAINER_BATTLE_PARAM.opponentA == TRAINER_KOANKO
-        && freeSprites >= 20;
+    if (gBattleStruct == NULL
+     || TempAllyGetState() != TEMP_ALLY_NONE
+     || gBattleStruct->koankoPhase != KOANKO_CONJURED_TEAM
+     || gBattleStruct->txRollback.combatProfile != TX_PROFILE_NONE
+     || (gBattleTypeFlags & (BATTLE_TYPE_DOUBLE | BATTLE_TYPE_MULTI | BATTLE_TYPE_LINK))
+     || gBattlersCount != 2
+     || freeSprites < 20)
+        return FALSE;
+
+    // Same split as TxRollback's creation check: battle tests do not populate the trainer parameters and
+    // run as recorded battles, so the encounter identity checks apply to real battles only. The
+    // koankoPhase gate above is what ties a test fixture to the encounter.
+    if (gTestRunnerEnabled)
+        return TRUE;
+
+    return !(gBattleTypeFlags & BATTLE_TYPE_RECORDED)
+        && TRAINER_BATTLE_PARAM.opponentA == TRAINER_KOANKO;
 }
 
 // Mirrors BS_TxRollbackCreate's live 2 -> 4 expansion, but player-right is the enabled slot and
@@ -157,15 +166,18 @@ void BS_TempAllyInitialize(void)
     NATIVE_ARGS();
     u32 battler = B_POSITION_PLAYER_RIGHT;
 
+    BattleLoadTempAllyHealthboxGfx(); // Must precede the healthbox sprites that use these tile tags.
     gHealthboxSpriteIds[battler] = CreateBattlerHealthboxSprites(battler);
     InitBattlerHealthboxCoords(battler);
     UpdateHealthboxAttribute(gHealthboxSpriteIds[battler], GetBattlerMon(battler), HEALTHBOX_ALL);
-    // Existing battlers move to their doubles coordinates. EMULATOR REVIEW: they keep their singles
-    // healthbox variant until a reload helper exists.
+    // Existing battlers move to their doubles coordinates (their healthbox frames were re-loaded above).
     for (u32 other = 0; other < B_POSITION_PLAYER_RIGHT; other++)
     {
         if (IsBattlerSpritePresent(other))
+        {
+            gSprites[gBattlerSpriteIds[other]].x = GetBattlerSpriteCoord(other, BATTLER_COORD_X_2);
             gSprites[gBattlerSpriteIds[other]].y = GetBattlerSpriteDefault_Y(other);
+        }
         InitBattlerHealthboxCoords(other);
         UpdateHealthboxAttribute(gHealthboxSpriteIds[other], GetBattlerMon(other), HEALTHBOX_ALL);
     }

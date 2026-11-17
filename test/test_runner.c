@@ -583,8 +583,8 @@ static void FunctionTest_SetUp(void *data)
 {
     (void)data;
     TestInitConfigData();
-    ClearRiggedRng();
     gFunctionTestRunnerState = AllocZeroed(sizeof(*gFunctionTestRunnerState));
+    ClearRiggedRng();
     SeedRng(0);
 }
 
