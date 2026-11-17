@@ -2,6 +2,11 @@
 #include "battle_script_native.h"
 #include "battle.h"
 #include "battle_ai_main.h"
+#include "battle_ai_record.h"
+#include "battle_break_bar.h"
+#include "battle_reduction.h"
+#include "battle_status_icons.h"
+#include "battle_util.h"
 #include "battle_controllers.h"
 #include "battle_gfx_sfx_util.h"
 #include "battle_interface.h"
@@ -19,6 +24,8 @@
 #include "data.h"
 #include "constants/songs.h"
 #include "constants/trainers.h"
+#include "constants/battle_ai.h"
+#include "constants/battle_anim.h"
 
 enum TempAllyState TempAllyGetState(void)
 {
@@ -53,6 +60,8 @@ void TempAllyClearStorage(void)
         gBattleStruct->gimmick.activeGimmick[B_TRAINER_PARTNER][i] = GIMMICK_NONE;
     }
     gBattleStruct->faintCounter[B_TRAINER_PARTNER] = 0;
+    gPartiesCount[B_TRAINER_PARTNER] = 0;
+    memset(gBattleStruct->itemLost[B_TRAINER_PARTNER], 0, sizeof(gBattleStruct->itemLost[B_TRAINER_PARTNER]));
 
     if (gAiPartyData != NULL)
     {
@@ -82,6 +91,7 @@ static void CreateTempAllyZacian(void)
     for (u32 i = 0; i < MAX_MON_MOVES; i++)
         SetMonMoveSlot(mon, moves[i], i);
     CalculateMonStats(mon);
+    gBattleStruct->itemLost[B_TRAINER_PARTNER][0].originalItem = item;
     gPartiesCount[B_TRAINER_PARTNER] = CalculatePartyCount(B_TRAINER_PARTNER);
 }
 
@@ -94,7 +104,7 @@ bool32 TempAllyCanEnter(void)
     if (gBattleStruct == NULL
      || TempAllyGetState() != TEMP_ALLY_NONE
      || gBattleStruct->koankoPhase != KOANKO_CONJURED_TEAM
-     || gBattleStruct->txRollback.combatProfile != TX_PROFILE_NONE
+     || TxRollbackSummonFormationActive()
      || (gBattleTypeFlags & (BATTLE_TYPE_DOUBLE | BATTLE_TYPE_MULTI | BATTLE_TYPE_LINK))
      || gBattlersCount != 2
      || freeSprites < 20)
@@ -149,8 +159,8 @@ void BS_TempAllyEnter(void)
         gBattlerSpriteIds[battler] = MAX_SPRITES;
         gHealthboxSpriteIds[battler] = MAX_SPRITES;
         memset(gBattleStruct->battlerPartyOrders[battler], 0, sizeof(gBattleStruct->battlerPartyOrders[battler]));
-        // The ally scores like Koanko's side: same AI flags as the opposing trainer's lead battler.
-        gAiThinkingStruct->aiFlags[battler] = gAiThinkingStruct->aiFlags[B_POSITION_OPPONENT_LEFT];
+        // Ordinary move scoring plus the owner-gated Koanko tactical pass.
+        gAiThinkingStruct->aiFlags[battler] = AI_FLAG_CHECK_BAD_MOVE | AI_FLAG_CHECK_VIABILITY | AI_FLAG_TRY_TO_FAINT | AI_FLAG_OMNISCIENT | AI_FLAG_DYNAMIC_FUNC;
         if (battler == B_POSITION_PLAYER_RIGHT)
             SetControllerToPlayerPartner(battler); // AI-driven, never opens a party menu for the player.
         else
@@ -217,7 +227,8 @@ void BS_TempAllyFinishEntry(void)
     NATIVE_ARGS();
     // The ally joins ordinary AI next turn: it was never in the already-chosen action queue.
     gBattleStruct->battlerState[B_POSITION_PLAYER_RIGHT].noOrderChange = TRUE;
-    TempAllySetState(TEMP_ALLY_ACTIVE);
+    if (TempAllyGetState() == TEMP_ALLY_ENTERING)
+        TempAllySetState(TEMP_ALLY_ACTIVE);
     gBattlescriptCurrInstr = cmd->nextInstr;
 }
 
@@ -230,6 +241,9 @@ void BS_TempAllyFinishEntry(void)
 #define TEMP_ALLY_ZIP_MIN_STEP  3
 #define TEMP_ALLY_ZIP_MAX_STEP  14
 #define TEMP_ALLY_ZIP_HOLD      12
+#define TEMP_ALLY_DASH_END_X    (DISPLAY_WIDTH + MON_PIC_WIDTH)
+#define TEMP_ALLY_DASH_STEP     16
+#define TEMP_ALLY_RECENTER_STEP 2
 
 static void Task_TempAllyZipIn(u8 taskId)
 {
@@ -285,4 +299,189 @@ u8 DoTempAllyZipInAnimation(u32 battler)
     gTasks[taskId].data[1] = 0;
     gTasks[taskId].data[2] = 0;
     return 0;
+}
+
+// The existing encounter-slot seam is shared with TX. Ownership and lifetimes
+// remain separate: only these right positions are reserved for this encounter.
+enum TxRollbackSlotPolicy TempAllyGetSlotPolicy(u32 battler)
+{
+    if (TempAllyGetState() == TEMP_ALLY_NONE)
+        return TX_SLOT_NORMAL;
+    if (battler == B_POSITION_OPPONENT_RIGHT)
+        return TX_SLOT_DISABLED;
+    if (battler == TEMP_ALLY_BATTLER)
+        return TempAllyGetState() == TEMP_ALLY_FAINTED ? TX_SLOT_RETIRED : TX_SLOT_RESERVED;
+    return TX_SLOT_NORMAL;
+}
+
+void TempAllyOnFaint(u32 battler)
+{
+    if (TempAllyOwnsBattler(battler) && gBattleMons[battler].hp == 0 && !IsBreakBarPending(battler))
+        TempAllySetState(TEMP_ALLY_FAINTED);
+}
+
+bool32 TempAllyTryDeparture(void)
+{
+    extern const u8 BattleScript_KoankoZacianDepart[];
+    if (TempAllyGetState() == TEMP_ALLY_NONE || TempAllyGetState() == TEMP_ALLY_DEPARTING
+     || gCurrentTurnActionNumber < gBattlersCount || gBattleControllerExecFlags != 0
+     || gBattleMons[B_POSITION_OPPONENT_LEFT].species != SPECIES_ETERNATUS_ETERNAMAX
+     || gBattleMons[B_POSITION_OPPONENT_LEFT].hp != 0
+     || IsBreakBarPending(B_POSITION_OPPONENT_LEFT) || GetBreakBarCount(B_POSITION_OPPONENT_LEFT) != 0)
+        return FALSE;
+    TempAllySetState(TEMP_ALLY_DEPARTING);
+    BattleScriptExecute(BattleScript_KoankoZacianDepart);
+    return TRUE;
+}
+
+// Idempotent data cleanup also used by abort/recorded cleanup. The global
+// battle graphics teardown owns sprites on those exits; live departure removes
+// its graphics first. Restore Reduction while the partner owner still exists.
+void TempAllyFinishBattle(void)
+{
+    if (TempAllyGetState() == TEMP_ALLY_NONE)
+        return;
+    // Recorded aborts may release graphics before FreeBattleResources reaches
+    // this hook. Never leave the entrance task pointing at freed sprite data.
+    u32 taskId = FindTaskIdByFunc(Task_TempAllyZipIn);
+    if (taskId != TASK_NONE)
+    {
+        DestroyTask(taskId);
+        gDoingBattleAnim = FALSE;
+        if (gBattleSpritesDataPtr != NULL)
+            gBattleSpritesDataPtr->healthBoxesData[TEMP_ALLY_BATTLER].ballAnimActive = FALSE;
+    }
+    ReductionResetOccupant(TEMP_ALLY_BATTLER);
+    TempAllyClearStorage();
+    for (u32 battler = 2; battler < MAX_BATTLERS_COUNT; battler++)
+    {
+        memset(&gBattleMons[battler], 0, sizeof(gBattleMons[battler]));
+        memset(&gBattleStruct->battlerState[battler], 0, sizeof(gBattleStruct->battlerState[battler]));
+        memset(&gProtectStructs[battler], 0, sizeof(gProtectStructs[battler]));
+        memset(&gSpecialStatuses[battler], 0, sizeof(gSpecialStatuses[battler]));
+        memset(&gBattleStruct->wish[battler], 0, sizeof(gBattleStruct->wish[battler]));
+        memset(&gBattleStruct->futureSight[battler], 0, sizeof(gBattleStruct->futureSight[battler]));
+        gBattleStruct->gimmick.toActivate &= ~(1u << battler);
+        gBattleStruct->gimmick.usableGimmick[battler] = GIMMICK_NONE;
+        memset(gBattleStruct->gimmick.activated[battler], 0, sizeof(gBattleStruct->gimmick.activated[battler]));
+        gChosenActionByBattler[battler] = gActionsByTurnOrder[battler] = B_ACTION_NOTHING_FAINTED;
+        gChosenMoveByBattler[battler] = MOVE_NONE;
+        gBattlerByTurnOrder[battler] = gBattlersBySpeed[battler] = battler;
+        gBattleStruct->monToSwitchIntoId[battler] = gBattleStruct->AI_monToSwitchIntoId[battler] = PARTY_SIZE;
+        gBattleStruct->moveTarget[battler] = B_POSITION_OPPONENT_LEFT;
+        gBattleStruct->dynamax.dynamaxTurns[battler] = 0;
+        gBattleStruct->dynamax.baseMoves[battler] = MOVE_NONE;
+        gBattleStruct->zmove.healReplacement &= ~(1u << battler);
+        gBattleStruct->zmove.possibleZMoves[battler] = 0;
+        gBattleStruct->zmove.baseMoves[battler] = MOVE_NONE;
+        gBattlerBattleController[battler] = BATTLE_CONTROLLER_NONE;
+        MarkBattleControllerIdleOnLocal(battler);
+        gBattlerControllerFuncs[battler] = NULL;
+        if (gAiBattleData != NULL)
+        {
+            gAiBattleData->aiUsingGimmick &= ~(1u << battler);
+            gAiBattleData->chosenMoveIndex[battler] = 0;
+            gAiBattleData->chosenTarget[battler] = B_POSITION_OPPONENT_LEFT;
+            memset(gAiBattleData->finalScore[battler], 0, sizeof(gAiBattleData->finalScore[battler]));
+        }
+        if (gBattleHistory != NULL)
+        {
+            ClearBattlerMoveHistory(battler);
+            ClearBattlerAbilityHistory(battler);
+            ClearBattlerItemEffectHistory(battler);
+            gBattleHistory->heldItems[battler] = ITEM_NONE;
+        }
+        if (gAiThinkingStruct != NULL)
+            gAiThinkingStruct->aiFlags[battler] = 0;
+        if (gAiLogicData != NULL)
+        {
+            gAiLogicData->battlerMovesScored &= ~(1u << battler);
+            gAiLogicData->shouldSwitch &= ~(1u << battler);
+            gAiLogicData->mostSuitableMonId[battler] = PARTY_SIZE;
+            gAiLogicData->monToSwitchInId[battler] = PARTY_SIZE;
+        }
+    }
+    // No left action remains at this barrier. Do not carry a right-side turn
+    // index into singles end-turn processing or the next replacement iteration.
+    for (u32 battler = 0; battler < 2; battler++)
+    {
+        gBattlerByTurnOrder[battler] = gBattlersBySpeed[battler] = battler;
+        gActionsByTurnOrder[battler] = B_ACTION_FINISHED;
+        if (gBattleStruct->moveTarget[battler] >= 2)
+            gBattleStruct->moveTarget[battler] = GetOppositeBattler(battler);
+    }
+    gHitMarker &= ~(HITMARKER_FAINTED(2) | HITMARKER_FAINTED(3));
+    gAbsentBattlerFlags |= (1u << 2) | (1u << 3);
+    gBattleTypeFlags &= ~BATTLE_TYPE_DOUBLE;
+    gBattlersCount = 2;
+    if (gAiLogicData != NULL)
+        gAiLogicData->reverseBattlerLogicOrder = FALSE;
+    gCurrentTurnActionNumber = min(gCurrentTurnActionNumber, 2);
+    gBattleStruct->eventState.endTurnBattler = min(gBattleStruct->eventState.endTurnBattler, 2);
+    if (gBattlerAttacker >= 2)
+        gBattlerAttacker = B_BATTLER_0;
+    if (gBattlerTarget >= 2)
+        gBattlerTarget = B_BATTLER_1;
+    if (gEffectBattler >= 2)
+        gEffectBattler = B_BATTLER_0;
+    if (gBattleScripting.battler >= 2)
+        gBattleScripting.battler = B_BATTLER_0;
+    TempAllySetState(TEMP_ALLY_NONE);
+}
+
+void BS_TempAllyDepart(void)
+{
+    NATIVE_ARGS();
+    u32 battler = TEMP_ALLY_BATTLER;
+    u32 spriteId = gBattlerSpriteIds[battler];
+    if (gBattleControllerExecFlags != 0 || IsAnyAbilityPopUpActive())
+        return;
+    // A living ally leaves ball-less, just as it arrived. A fainted sprite has
+    // already been destroyed by its controller, so never reuse its old id.
+    if (gBattleMons[battler].hp != 0 && spriteId < MAX_SPRITES && gSprites[spriteId].inUse)
+    {
+        if (gSprites[spriteId].x < TEMP_ALLY_DASH_END_X)
+        {
+            // Healthboxes use priority 1. Keep the dash beneath their panels
+            // while crossing the right side, without changing any UI sprites.
+            gSprites[spriteId].oam.priority = 2;
+            gSprites[spriteId].x += TEMP_ALLY_DASH_STEP;
+            return;
+        }
+        FreeSpriteOamMatrix(&gSprites[spriteId]);
+        DestroySprite(&gSprites[spriteId]);
+    }
+    gBattlerSpriteIds[battler] = MAX_SPRITES;
+    if (TempAllyGetState() != TEMP_ALLY_NONE)
+    {
+        for (u32 icon = 0; icon < BATTLE_STATUS_ICON_COUNT; icon++)
+            DestroyBattleStatusIcon(battler, icon);
+        DestroyBattlerHealthbox(battler);
+        FreeSpriteTilesByTag(TAG_HEALTHBOX_PLAYER2_TILE);
+        FreeSpriteTilesByTag(TAG_HEALTHBAR_PLAYER2_TILE);
+        TempAllyFinishBattle();
+        BattleRestoreSinglesHealthboxGfx();
+        for (u32 other = 0; other < 2; other++)
+            RebuildBattlerHealthbox(other);
+    }
+    // Ownership/layout cleanup happens once. This script command remains at
+    // the replacement barrier while the surviving player slides to singles;
+    // a fainted player's replacement will instead spawn centered normally.
+    for (u32 other = 0; other < 2; other++)
+    {
+        spriteId = gBattlerSpriteIds[other];
+        if (gBattleMons[other].hp != 0 && IsBattlerSpritePresent(other) && spriteId < MAX_SPRITES && gSprites[spriteId].inUse)
+        {
+            s16 targetX = GetBattlerSpriteCoord(other, BATTLER_COORD_X_2);
+            if (gSprites[spriteId].x != targetX)
+            {
+                gSprites[spriteId].x = gSprites[spriteId].x < targetX
+                    ? min(gSprites[spriteId].x + TEMP_ALLY_RECENTER_STEP, targetX)
+                    : max(gSprites[spriteId].x - TEMP_ALLY_RECENTER_STEP, targetX);
+                return;
+            }
+            gSprites[spriteId].y = GetBattlerSpriteDefault_Y(other);
+        }
+    }
+    gBattlescriptCurrInstr = cmd->nextInstr;
 }

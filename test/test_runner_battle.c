@@ -300,6 +300,8 @@ static enum BattleTrainer Test_GetBattlerTrainer(enum BattlerId battlerId)
     // does not exist in gBattlerPositions yet during action recording.
     if (DATA.hasSummonedOpponent && battlerId == B_BATTLER_3)
         return B_TRAINER_OPPONENT_A;
+    if (DATA.hasSummonedAlly && battlerId == B_BATTLER_2)
+        return B_TRAINER_PARTNER;
     return (gBattleTestRunnerState->data.battlerTrainers >> (2 * battlerId)) & 0x3;
 }
 
@@ -3013,6 +3015,19 @@ void DeclareSummonedOpponent(u32 sourceLine)
         SetMonMoveSlot(&DATA.summonedOpponentMon, moves[i], i);
 }
 
+void DeclareSummonedAlly(u32 sourceLine)
+{
+    INVALID_IF(!IsAITest() || STATE->battlersCount != 2, "SUMMONED_ALLY requires an AI Singles test");
+    INVALID_IF(DATA.turns == 0 || DATA.turnState != TURN_CLOSED, "Declare the ally after its creation TURN");
+    DATA.hasSummonedAlly = TRUE;
+    DATA.currentMonIndexes[B_POSITION_PLAYER_RIGHT] = 0;
+    CreateMonWithIVs(&DATA.summonedAllyMon, SPECIES_ZACIAN_CROWNED, 100, 13,
+                    OTID_STRUCT_PRESET(0x12345678), 31);
+    const u16 moves[MAX_MON_MOVES] = {MOVE_BEHEMOTH_BLADE, MOVE_SACRED_SWORD, MOVE_PLAY_ROUGH, MOVE_SWORDS_DANCE};
+    for (u32 i = 0; i < MAX_MON_MOVES; i++)
+        SetMonMoveSlot(&DATA.summonedAllyMon, moves[i], i);
+}
+
 void CloseTurn(u32 sourceLine)
 {
     s32 i;
@@ -3020,13 +3035,15 @@ void CloseTurn(u32 sourceLine)
     DATA.turnState = TURN_CLOSING;
 
     // If Move was not specified always use Celebrate. In AI Tests allow any taken action.
-    for (i = 0; i < (DATA.hasSummonedOpponent ? MAX_BATTLERS_COUNT : STATE->battlersCount); i++)
+    for (i = 0; i < (DATA.hasSummonedOpponent || DATA.hasSummonedAlly ? MAX_BATTLERS_COUNT : STATE->battlersCount); i++)
     {
         if (DATA.hasSummonedOpponent && i == B_POSITION_PLAYER_RIGHT)
             continue;
+        if (DATA.hasSummonedAlly && i == B_POSITION_OPPONENT_RIGHT)
+            continue;
         if (!(DATA.actionBattlers & (1 << i)))
         { // Multi test partner trainers want setting to RecordedPartner controller if no move set in this case; EXPECT_XXXX will set to PlayerPartner.
-            if (IsAITest() && (i & BIT_SIDE) == B_SIDE_OPPONENT) // If Move was not specified, allow any move used.
+            if (IsAITest() && ((i & BIT_SIDE) == B_SIDE_OPPONENT || (DATA.hasSummonedAlly && i == B_POSITION_PLAYER_RIGHT)))
                 SetAiActionToPass(sourceLine, i);
             else
                 Move(sourceLine, &gBattleMons[i], (struct MoveContext) { move: MOVE_CELEBRATE, explicitMove: TRUE });
@@ -3038,6 +3055,8 @@ void CloseTurn(u32 sourceLine)
 
 static struct Pokemon *CurrentMon(enum BattlerId battlerId)
 {
+    if (DATA.hasSummonedAlly && battlerId == B_BATTLER_2)
+        return &DATA.summonedAllyMon;
     if (DATA.hasSummonedOpponent && battlerId == B_BATTLER_3)
         return &DATA.summonedOpponentMon;
     enum BattleTrainer trainer = Test_GetBattlerTrainer(battlerId);

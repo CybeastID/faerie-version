@@ -1,5 +1,116 @@
 # Upstream modification ledger
 
+## Koanko Stage 07: independent ally and singles restoration (2026-11-17)
+
+Implementation details and exact validation status:
+[temporary ally](temporary_ally.md). Stage 07 preserves the previously observed
+entry choreography and existing partner-row ownership accessors. New hooks:
+
+- `battle_main.c:FaintClearSetData`: narrow post-Reduction hook marks only the
+  temporary actor FAINTED. Normal faint effects/animation and real-party loss
+  authority remain. `HandleEndTurn_FinishBattle`, `Test_RestorePlayerBattleStats`
+  and `battle_util2.c:FreeBattleResources` invoke idempotent ally cleanup before
+  battle ownership storage disappears. Audit cleanup order when upstream moves
+  resource or party restoration. Regressions: ally faint, player loss, simultaneous
+  KOs, recorded AFTER_CLEANUP and idempotent cleanup.
+- `battle_util.c:HandleFaintedMonActions` adds a barrier at WAIT_STATE before
+  replacement iteration. The custom module schedules departure only after all
+  chosen actions finish and genuine final Eternamax faint is established. Queue,
+  count and end-turn cursor restoration live in the custom module. Narrow hook,
+  but significant semantic dependency on action/faint/end-turn ordering. Recheck
+  this barrier if upstream changes when replacements run. Regressions: departure
+  alive/already fainted/Life Orb double KO, Explosion with both real replacements.
+- `battle_controller_player_partner.c:PlayerPartnerHandleChooseAction/
+  PlayerPartnerHandleChoosePokemon`: narrow independent-owner gates prevent
+  switching, bag use or reserve/revival requests. Normal cached move selection
+  remains. `battle_ai_switch.c:ShouldSwitch/GetMostSuitableMonToSwitchInto`
+  short-circuit this owner before evaluating switches. Regressions: next-turn
+  attack, Disable, player replacement, ordinary doubles/multi and trainer control.
+- `battle_gimmick.c:CanActivateGimmick/HasTrainerUsedGimmick/
+  SetGimmickAsActivated` exclude the ally from activation and cross-owner sharing
+  (including Dynamax's broader sharing rule). `battle_util.c:
+  IsPartnerMonFromSameTrainer` distinguishes the independent owner without setting
+  MULTI/INGAME_PARTNER. Narrow ownership conditions; review new trainer-wide
+  abilities/gimmicks for assumptions based only on battle side. Regressions:
+  owner canaries, Intrepid Sword, multi/doubles gimmick tests.
+- `battle_script_commands.c:Cmd_checkteamslost` counts one reserve-bearing real
+  owner per side during this formation, avoiding fake partner capacity. Existing
+  replacement/revival paths use the shared position-policy seam. `battle_util.c:
+  HasNoMonsToSwitch`, `battle_ai_util.c:CountUsablePartyMons/
+  AnyPartyMemberStatused` exclude the temporary ally's local party index and read
+  its own status. AI exceptions apply only during this formation; ordinary multi
+  reserve-count behavior is preserved. Validate reserves, healing, status and
+  simultaneous KOs.
+- `party_menu.c:GetPartyLayoutFromBattleType/BufferBattlePartyCurrentOrder/
+  BufferBattlePartyOrderBySide` use a single real active slot when the partner has
+  another owner or is disabled/retired. This avoids duplicate local index 0 and a
+  seventh write into a six-entry ordering buffer. `battle_main.c:SwitchPartyOrder`
+  excludes the temporary owner from shared order copies while retaining ordinary
+  multi ordering. Regressions: six-slot
+  ordering canary, real replacement and ordinary multi/partner control.
+- `battle_util.c:ResetSentPokesToOpponentValue/
+  OpponentSwitchInResetSentPokesToOpponentValue/UpdateSentPokesToOpponentValue`
+  skip the temporary owner in real-player EXP participation masks. Existing
+  controller identity keeps it out of EXP recipients. Narrow gates; review if
+  upstream adds a separate participation mechanism. Regression: player-left slot
+  1 plus independent local slot 0 does not mark real player slot 0 present.
+- `battle_interface.c:DestroyBattlerHealthbox/RebuildBattlerHealthbox` extracts
+  reusable selective destruction; rebuilding retains visibility/shared UI ids.
+  `Task_FreeAbilityPopUpGfx` scans all four allocated positions so shrinking the
+  live count cannot leak a right-side popup sheet. `battle_gfx_sfx_util.c:
+  BattleRestoreSinglesHealthboxGfx` reallocates singles frames after a possible
+  doubles menu reshow; `CreateEnemyShadowSprite` skips DISABLED as well as RETIRED
+  positions. Small graphics lifecycle extensions; upstream changes to tags,
+  healthbox children, tile sizes or shadow policy require semantic review.
+  Graphical acceptance is reserved for the user.
+- `battle_interface.c:GetBattlerCoordsIndex` extends the existing disabled-right
+  singles-layout rule to opponent-left. Koanko's opponent-right is disabled even
+  with a six-member opponent party, so sprite creation, animation targets and
+  menu reshow must all retain centered singles coordinates. Narrow shared-policy
+  correction; no per-move animation patches or extra reshow hook. Castoria's
+  reserved opponent-right and ordinary doubles retain their existing layout.
+  Regressions: six-member coordinate canary, live Behemoth Blade with reserves,
+  actual recreated sprite position after forced reshow, ordinary trainer slides.
+  Review upstream layout policy changes for side topology versus reserve counts.
+- `battle_util.c:CalcMoveBasePower` (EFFECT_DYNAMAX_DOUBLE_DMG) adds the
+  encounter-gated `KoankoIsEternamaxTarget` predicate. Shared real/AI calculation
+  doubles power without fabricating Dynamax state. Narrow rule, approved by the
+  user on 2026-11-17. Regression: live damage and cached AI estimates against the
+  same genuine Eternamax in Koanko and an unrelated trainer battle.
+- `test/test_runner_battle.c`, `include/test/battle.h`: SUMMONED_ALLY describes
+  later player-right AI expectations without modifying recorded real parties or
+  battle format. It parallels the existing SUMMONED_OPPONENT seam. This is a
+  test-only infrastructure extension; validate both summon test groups.
+
+Custom-module changes: `battle_temp_ally.c` owns lifecycle, storage, exit and
+cleanup; `battle_koanko_ai.c` dispatches owner-gated pressure/setup scoring.
+The departure native now dashes the living ally right behind healthboxes, cleans
+the formation once, then remains pending while the surviving player slides to
+singles center before replacement resumes. These presentation phases reuse the
+same script barrier; they add no upstream hooks or battle-state fields. Live
+frame observers cover dash direction, UI priority, fully offscreen removal,
+bounded player translation and centering before Dialga; simultaneous faint
+coverage retains normal centered replacement instead of moving a stale sprite.
+`battle_tx_rollback.c` exposes its existing formation predicate and delegates the
+shared slot-policy seam while an ally exists. Solo TX faint state and persistent
+Reduction lifetime are unchanged. Keeping transitions in custom modules limits
+textual upstream conflicts; semantic risk still spans owner routing, action/faint
+ordering, resource lifetimes and future gimmicks, even where no conflict appears.
+
+After graphical review and departure-motion polish, the final focused Zacian
+suite passes 20/20, including live per-frame dash/recentering assertions.
+Parameterized departure covers living, already fainted, recoil double KO and
+continuing Reduction; separate cases cover centered menu reshow, six-member
+coordinate policy, residual damage, simultaneous real replacements and aborting
+entry after graphics teardown. Cleanup also redirects right-position script
+cursors. For the shared coordinate correction, TX profiles pass 7/7 and trainer
+slides pass 75/75; More Wishes retains
+its prior revival assertion failure (18/19). Ordinary ROM compilation succeeds.
+Starting-commit and last full-suite comparisons are
+recorded in the implementation note; graphical acceptance is reserved for the
+user. The intentionally failing trainer-bar CRASH DUMMY test was removed at the
+user's request (the remaining file passes 11/11).
+
 ## Resumed migration: native and script APIs
 
 The migrated ROM builds through `resume-rom-09.log` (exit 0), including the

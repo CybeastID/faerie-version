@@ -5,6 +5,7 @@
 #include "battle_ai_switch.h"
 #include "battle_ai_util.h"
 #include "battle_util.h"
+#include "battle_temp_ally.h"
 #include "battle_anim.h"
 #include "battle_controllers.h"
 #include "battle_main.h"
@@ -1415,6 +1416,8 @@ void GetShouldSwitchPartyMonEligibility(struct SwitchAiContext *switchContext)
 
 bool32 ShouldSwitch(enum BattlerId battler)
 {
+    if (TempAllyOwnsBattler(battler))
+        return FALSE;
     struct SwitchAiContext switchContext = {0};
     switchContext.battler = battler;
     switchContext.opposingBattler = GetOppositeBattler(switchContext.battler);
@@ -2608,6 +2611,8 @@ static u32 GetNextMonInParty(struct Pokemon *party, int lastId, enum BattlerId b
 
 u32 GetMostSuitableMonToSwitchInto(enum BattlerId battler, enum SwitchType switchType)
 {
+    if (TempAllyOwnsBattler(battler))
+        return PARTY_SIZE;
     enum BattlerId opposingBattler = 0;
     u32 bestMonId = PARTY_SIZE;
     enum BattlerId battlerIn1 = 0, battlerIn2 = 0;

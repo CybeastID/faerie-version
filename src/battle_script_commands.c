@@ -1,5 +1,6 @@
 #include "global.h"
 #include "battle.h"
+#include "battle_temp_ally.h"
 #include "battle_hold_effects.h"
 #include "battle_message.h"
 #include "battle_anim.h"
@@ -2703,6 +2704,8 @@ static void Cmd_checkteamslost(void)
         {
             u32 playerCapacity = gBattlersCount / 2;
             u32 opponentCapacity = gBattlersCount / 2;
+            if (TempAllyGetState() != TEMP_ALLY_NONE)
+                playerCapacity = opponentCapacity = 1; // Only the real owners have reserves.
             if (TxRollbackGetSlotPolicy(GetBattlerAtPosition(B_POSITION_PLAYER_RIGHT)) == TX_SLOT_DISABLED)
             {
                 playerCapacity = 1;

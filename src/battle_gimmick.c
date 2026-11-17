@@ -4,6 +4,7 @@
 #include "battle_controllers.h"
 #include "battle_interface.h"
 #include "battle_gimmick.h"
+#include "battle_temp_ally.h"
 #include "battle_z_move.h"
 #include "battle_setup.h"
 #include "battle_util.h"
@@ -36,6 +37,8 @@ void AssignUsableGimmicks(void)
 // Returns whether a battler is able to use a gimmick. Checks consumption and gimmick specific functions.
 bool32 CanActivateGimmick(enum BattlerId battler, enum Gimmick gimmick)
 {
+    if (TempAllyOwnsBattler(battler))
+        return FALSE;
     return gGimmicksInfo[gimmick].CanActivate != NULL && gGimmicksInfo[gimmick].CanActivate(battler);
 }
 
@@ -94,7 +97,8 @@ bool32 ShouldTrainerPartyMonUseGimmick(u32 battler, u32 partyIndex, enum Gimmick
 // Returns whether a trainer has used a gimmick during a battle.
 bool32 HasTrainerUsedGimmick(enum BattlerId battler, enum Gimmick gimmick)
 {
-    if (IsDoubleBattle() && (IsPartnerMonFromSameTrainer(battler) || (gimmick == GIMMICK_DYNAMAX)))
+    if (IsDoubleBattle() && !TempAllyOwnsBattler(battler) && !TempAllyOwnsBattler(GetPartnerBattler(battler))
+     && (IsPartnerMonFromSameTrainer(battler) || (gimmick == GIMMICK_DYNAMAX)))
     {
         enum BattlerId partner = GetPartnerBattler(battler);
         if (gBattleStruct->gimmick.activated[partner][gimmick]
@@ -109,7 +113,8 @@ bool32 HasTrainerUsedGimmick(enum BattlerId battler, enum Gimmick gimmick)
 void SetGimmickAsActivated(enum BattlerId battler, enum Gimmick gimmick)
 {
     gBattleStruct->gimmick.activated[battler][gimmick] = TRUE;
-    if (IsDoubleBattle() && (IsPartnerMonFromSameTrainer(battler) || (gimmick == GIMMICK_DYNAMAX)))
+    if (IsDoubleBattle() && !TempAllyOwnsBattler(battler) && !TempAllyOwnsBattler(GetPartnerBattler(battler))
+     && (IsPartnerMonFromSameTrainer(battler) || (gimmick == GIMMICK_DYNAMAX)))
         gBattleStruct->gimmick.activated[GetPartnerBattler(battler)][gimmick] = TRUE;
 }
 

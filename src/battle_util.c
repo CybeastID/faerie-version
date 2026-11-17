@@ -6,6 +6,8 @@
 #include "battle_environment.h"
 #include "battle_pyramid.h"
 #include "battle_util.h"
+#include "battle_temp_ally.h"
+#include "battle_koanko.h"
 #include "battle_controllers.h"
 #include "battle_interface.h"
 #include "battle_setup.h"
@@ -1357,7 +1359,8 @@ void ResetSentPokesToOpponentValue(void)
     gSentPokesToOpponent[1] = 0;
 
     for (i = 0; i < gBattlersCount; i += 2)
-        bits |= 1u << gBattlerPartyIndexes[i];
+        if (!TempAllyOwnsBattler(i))
+            bits |= 1u << gBattlerPartyIndexes[i];
 
     for (i = 1; i < gBattlersCount; i += 2)
         gSentPokesToOpponent[(i & BIT_FLANK) >> 1] = bits;
@@ -1375,7 +1378,7 @@ void OpponentSwitchInResetSentPokesToOpponentValue(enum BattlerId battler)
 
         for (i = 0; i < gBattlersCount; i += 2)
         {
-            if (!(gAbsentBattlerFlags & (1u << i)))
+            if (!(gAbsentBattlerFlags & (1u << i)) && !TempAllyOwnsBattler(i))
                 bits |= 1u << gBattlerPartyIndexes[i];
         }
         gSentPokesToOpponent[flank] = bits;
@@ -1384,6 +1387,8 @@ void OpponentSwitchInResetSentPokesToOpponentValue(enum BattlerId battler)
 
 void UpdateSentPokesToOpponentValue(enum BattlerId battler)
 {
+    if (TempAllyOwnsBattler(battler))
+        return;
     if (!IsOnPlayerSide(battler))
     {
         OpponentSwitchInResetSentPokesToOpponentValue(battler);
@@ -1962,6 +1967,10 @@ bool32 HandleFaintedMonActions(void)
             {
                 return FALSE;
             }
+            // All chosen actions have finished. Collapse before any replacement
+            // scripts iterate the formation, never inside their battler loops.
+            if (TempAllyTryDeparture())
+                return TRUE;
             gBattleStruct->eventState.faintedActionBattler = 0;
             gBattleStruct->eventState.faintedAction++;
             // fall through
@@ -2030,7 +2039,7 @@ bool32 HasNoMonsToSwitch(enum BattlerId battler, u8 partyIdBattlerOn1, u8 partyI
         if (partyIdBattlerOn1 == PARTY_SIZE)
             partyIdBattlerOn1 = gBattlerPartyIndexes[flankId];
         if (partyIdBattlerOn2 == PARTY_SIZE)
-            partyIdBattlerOn2 = TxRollbackGetSlotPolicy(playerId) == TX_SLOT_DISABLED ? PARTY_SIZE : gBattlerPartyIndexes[playerId];
+            partyIdBattlerOn2 = !BattlersShareParty(battler, playerId) || TxRollbackGetSlotPolicy(playerId) == TX_SLOT_DISABLED ? PARTY_SIZE : gBattlerPartyIndexes[playerId];
 
         for (i = 0; i < lastId; i++)
         {
@@ -2106,7 +2115,7 @@ bool32 HasNoMonsToSwitch(enum BattlerId battler, u8 partyIdBattlerOn1, u8 partyI
         if (partyIdBattlerOn1 == PARTY_SIZE)
             partyIdBattlerOn1 = gBattlerPartyIndexes[flankId];
         if (partyIdBattlerOn2 == PARTY_SIZE)
-            partyIdBattlerOn2 = TxRollbackGetSlotPolicy(playerId) == TX_SLOT_DISABLED ? PARTY_SIZE : gBattlerPartyIndexes[playerId];
+            partyIdBattlerOn2 = !BattlersShareParty(battler, playerId) || TxRollbackGetSlotPolicy(playerId) == TX_SLOT_DISABLED ? PARTY_SIZE : gBattlerPartyIndexes[playerId];
 
         for (i = 0; i < lastId; i++)
         {
@@ -6559,7 +6568,7 @@ static inline u32 CalcMoveBasePower(struct DamageContext *ctx)
         basePower = CalcTerrainBoostedPower(ctx, basePower);
         break;
     case EFFECT_DYNAMAX_DOUBLE_DMG:
-        if (GetActiveGimmick(battlerDef) == GIMMICK_DYNAMAX)
+        if (GetActiveGimmick(battlerDef) == GIMMICK_DYNAMAX || KoankoIsEternamaxTarget(battlerDef))
             basePower *= 2;
         break;
     case EFFECT_HIDDEN_POWER:
@@ -8716,6 +8725,10 @@ s32 GetStealthHazardDamage(enum TypeSideHazard hazardType, enum BattlerId battle
 
 bool32 IsPartnerMonFromSameTrainer(enum BattlerId battler)
 {
+    // Keep the ordinary AI's hot path free of out-of-line ownership calls.
+    if (gBattleStruct != NULL && gBattleStruct->tempAllyState != TEMP_ALLY_NONE
+     && (TempAllyOwnsBattler(battler) || TempAllyOwnsBattler(GetPartnerBattler(battler))))
+        return FALSE;
     if (!IsOnPlayerSide(battler))
         return !(gBattleTypeFlags & BATTLE_TYPE_TWO_OPPONENTS);
     else

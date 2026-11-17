@@ -1,4 +1,5 @@
 #include "global.h"
+#include "battle_temp_ally.h"
 #include "battle_z_move.h"
 #include "malloc.h"
 #include "battle.h"
@@ -3977,11 +3978,14 @@ bool32 AnyPartyMemberStatused(enum BattlerId battlerId, bool32 checkSoundproof)
     {
         battlerOnField1 = gBattlerPartyIndexes[battlerId];
         battlerOnField2 = gBattlerPartyIndexes[GetPartnerBattler(battlerId)];
+        if (gBattleStruct->tempAllyState != TEMP_ALLY_NONE && IsOnPlayerSide(battlerId))
+            battlerOnField2 = PARTY_SIZE;
         // Check partner's status
         if ((GetConfig(B_HEAL_BELL_SOUNDPROOF) == GEN_5
             || gAiLogicData->abilities[GetPartnerBattler(battlerId)] != ABILITY_SOUNDPROOF
             || !checkSoundproof)
-         && GetMonData(&party[battlerOnField2], MON_DATA_STATUS) != STATUS1_NONE
+         && GetMonData(gBattleStruct->tempAllyState != TEMP_ALLY_NONE && IsOnPlayerSide(battlerId)
+                       ? GetBattlerMon(GetPartnerBattler(battlerId)) : &party[battlerOnField2], MON_DATA_STATUS) != STATUS1_NONE
          && ShouldCureStatus(battlerId, GetPartnerBattler(battlerId), gAiLogicData))
             hasStatusToCure = TRUE;
     }
@@ -4615,6 +4619,8 @@ s32 CountUsablePartyMons(enum BattlerId battlerId)
     {
         battlerOnField1 = gBattlerPartyIndexes[battlerId];
         battlerOnField2 = gBattlerPartyIndexes[GetPartnerBattler(battlerId)];
+        if (gBattleStruct->tempAllyState != TEMP_ALLY_NONE && IsOnPlayerSide(battlerId))
+            battlerOnField2 = PARTY_SIZE;
     }
     else // In singles there's only one battlerId by side.
     {
