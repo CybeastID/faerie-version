@@ -797,6 +797,29 @@ void BattleLoadTxRollbackHealthboxGfx(void)
     LoadCompressedSpriteSheet(&sSpriteSheets_HealthBar[B_POSITION_OPPONENT_RIGHT]);
 }
 
+// Koanko's temporary player-right ally: a singles battle loaded only the singles healthbox graphics.
+// Load player-right's doubles frame and health bar, and re-frame any left battler that now uses doubles
+// coordinates inside its existing allocation (the doubles frame, 0x800, fits the singles slot, 0x1000).
+void BattleLoadTempAllyHealthboxGfx(void)
+{
+    u32 tile;
+
+    if (GetBattlerCoordsIndex(GetBattlerAtPosition(B_POSITION_PLAYER_LEFT)) == BATTLE_COORDS_DOUBLES)
+    {
+        tile = GetSpriteTileStartByTag(TAG_HEALTHBOX_PLAYER1_TILE);
+        if (tile != 0xFFFF)
+            DecompressDataWithHeaderVram(gHealthboxDoublesPlayerGfx, (void *)(OBJ_VRAM0 + tile * TILE_SIZE_4BPP));
+    }
+    if (GetBattlerCoordsIndex(GetBattlerAtPosition(B_POSITION_OPPONENT_LEFT)) == BATTLE_COORDS_DOUBLES)
+    {
+        tile = GetSpriteTileStartByTag(TAG_HEALTHBOX_OPPONENT1_TILE);
+        if (tile != 0xFFFF)
+            DecompressDataWithHeaderVram(gHealthboxDoublesOpponentGfx, (void *)(OBJ_VRAM0 + tile * TILE_SIZE_4BPP));
+    }
+    LoadCompressedSpriteSheet(&sSpriteSheets_DoublesPlayerHealthbox[1]);
+    LoadCompressedSpriteSheet(&sSpriteSheets_HealthBar[B_POSITION_PLAYER_RIGHT]);
+}
+
 void LoadBattleBarGfx(u8 unused)
 {
     DecompressDataWithHeaderWram(gBattleInterfaceGfx_BattleBar, gMonSpritesGfxPtr->barFontGfx);
