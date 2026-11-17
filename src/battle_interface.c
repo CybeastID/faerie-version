@@ -6,6 +6,7 @@
 #include "battle_controllers.h"
 #include "battle_interface.h"
 #include "battle_status_icons.h"
+#include "battle_temp_ally.h"
 #include "battle_z_move.h"
 #include "graphics.h"
 #include "sprite.h"
@@ -609,7 +610,8 @@ static const union TextColor sHealthBoxTextColor =
 enum BattleCoordTypes GetBattlerCoordsIndex(enum BattlerId battler)
 {
     if (GetBattlerPosition(battler) == B_POSITION_PLAYER_LEFT
-     && (gPartiesCount[B_TRAINER_PLAYER] == 1 || TxRollbackGetSlotPolicy(GetBattlerAtPosition(B_POSITION_PLAYER_RIGHT)) == TX_SLOT_DISABLED) && !(gBattleTypeFlags & BATTLE_TYPE_MULTI))
+     && (gPartiesCount[B_TRAINER_PLAYER] == 1 || TxRollbackGetSlotPolicy(GetBattlerAtPosition(B_POSITION_PLAYER_RIGHT)) == TX_SLOT_DISABLED) && !(gBattleTypeFlags & BATTLE_TYPE_MULTI)
+     && TempAllyGetState() == TEMP_ALLY_NONE) // Koanko's temporary ally (partner row) makes the player's slot doubles
         return BATTLE_COORDS_SINGLES;
     else if (GetBattlerPosition(battler) == B_POSITION_OPPONENT_LEFT && gPartiesCount[B_TRAINER_OPPONENT_A] == 1 && !(gBattleTypeFlags & BATTLE_TYPE_TWO_OPPONENTS))
         return BATTLE_COORDS_SINGLES;
@@ -889,6 +891,36 @@ void InitBattlerHealthboxCoords(enum BattlerId battler)
 
     GetBattlerHealthboxCoords(battler, &x, &y);
     UpdateSpritePos(gHealthboxSpriteIds[battler], x, y);
+}
+
+// Rebuilds a battler's healthbox for the layout it uses now. A box is created from the singles or doubles
+// sprite template (shape, right-half tile offset and health-bar sprite all differ on the player side), so
+// moving an existing singles box to doubles coordinates cannot convert it. Visibility is preserved.
+void RebuildBattlerHealthbox(enum BattlerId battler)
+{
+    u8 oldLeft = gHealthboxSpriteIds[battler];
+    u8 ballIds[2] = { gBattleStruct->ballSpriteIds[0], gBattleStruct->ballSpriteIds[1] };
+    u8 moveInfoId = gBattleStruct->moveInfoSpriteId;
+    bool32 visible;
+
+    if (oldLeft >= MAX_SPRITES)
+        return;
+
+    visible = !gSprites[oldLeft].invisible;
+    DestroyIndicatorSprite(battler);
+    DestroySprite(&gSprites[gSprites[oldLeft].hMain_HealthBarSpriteId]);
+    DestroySprite(&gSprites[gSprites[oldLeft].oam.affineParam]);
+    DestroySprite(&gSprites[oldLeft]);
+
+    gHealthboxSpriteIds[battler] = CreateBattlerHealthboxSprites(battler);
+    // Creation resets the shared last-used-ball and move-info sprite ids; this rebuild must not disturb them.
+    gBattleStruct->ballSpriteIds[0] = ballIds[0];
+    gBattleStruct->ballSpriteIds[1] = ballIds[1];
+    gBattleStruct->moveInfoSpriteId = moveInfoId;
+    InitBattlerHealthboxCoords(battler);
+    UpdateHealthboxAttribute(gHealthboxSpriteIds[battler], GetBattlerMon(battler), HEALTHBOX_ALL);
+    if (visible)
+        SetHealthboxSpriteVisible(gHealthboxSpriteIds[battler]);
 }
 
 static void UpdateLvlInHealthbox(u8 healthboxSpriteId, u8 lvl, u16 species)

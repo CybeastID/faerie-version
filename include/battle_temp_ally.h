@@ -26,7 +26,10 @@ bool32 TempAllyOwnsTrainer(enum BattleTrainer trainer);
 bool32 TempAllyCanEnter(void);
 void BS_TempAllyEnter(void);
 void BS_TempAllyInitialize(void);
+void BS_TempAllySlideBattlers(void);
 void BS_TempAllyFinishEntry(void);
+// Ball-less entrance, same send-out contract as the Kazuradrop entrance (see kazuradrop_entrance.c).
+u8 DoTempAllyZipInAnimation(u32 battler);
 // Zero every partner-row structure the ally uses. Called before it enters and after it leaves.
 void TempAllyClearStorage(void);
 
