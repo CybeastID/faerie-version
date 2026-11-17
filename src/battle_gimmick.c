@@ -399,6 +399,17 @@ void CreateIndicatorSprite(enum BattlerId battler)
     gSprites[spriteId].invisible = FALSE;
 }
 
+void DestroyIndicatorSprite(enum BattlerId battler)
+{
+    u32 spriteId = gBattleStruct->gimmick.indicatorSpriteId[battler];
+
+    if (spriteId < MAX_SPRITES && gSprites[spriteId].inUse)
+        DestroySprite(&gSprites[spriteId]);
+    gBattleStruct->gimmick.indicatorSpriteId[battler] = MAX_SPRITES;
+    // CreateIndicatorSprite loads the sheet without checking for an existing copy.
+    FreeSpriteTilesByTag(sBattler_GimmickSpritesheets[battler].tag);
+}
+
 #undef tBattler
 #undef tPosX
 #undef tLevelXDelta

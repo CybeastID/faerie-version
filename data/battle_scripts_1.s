@@ -6580,10 +6580,11 @@ BattleScript_KoankoZacianArrive::
     waitstate
     switchindataupdate BS_SCRIPTING
     callnative BS_TempAllyInitialize
-    printstring STRINGID_KOANKO_ZACIAN_ARRIVES
-    waitmessage B_WAIT_TIME_LONG
+    callnative BS_TempAllySlideBattlers
     switchinanim BS_SCRIPTING, FALSE, FALSE
     waitstate
+	printstring STRINGID_KOANKO_ZACIAN_ARRIVES
+    waitmessage B_WAIT_TIME_LONG
     switchineffects BS_SCRIPTING
     switchinevents
     callnative BS_TempAllyFinishEntry

@@ -2081,6 +2081,8 @@ void StartSendOutAnim(enum BattlerId battler, bool32 dontClearTransform, bool32 
     gSprites[gBattleControllerData[battler]].data[2] = battler;
     if (!IsOnPlayerSide(battler) && UseCustomSendOut(species))
         gSprites[gBattleControllerData[battler]].data[0] = DoKazuradropAppearAnimation(battler);
+    else if (TempAllyOwnsBattler(battler))
+        gSprites[gBattleControllerData[battler]].data[0] = DoTempAllyZipInAnimation(battler);
     else
         gSprites[gBattleControllerData[battler]].data[0] = DoPokeballSendOutAnimation(battler, 0, sendoutType);
 }

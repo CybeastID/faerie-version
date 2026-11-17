@@ -14,6 +14,10 @@
 #include "battle_tx_rollback.h"
 #include "pokemon.h"
 #include "sprite.h"
+#include "sound.h"
+#include "task.h"
+#include "data.h"
+#include "constants/songs.h"
 #include "constants/trainers.h"
 
 enum TempAllyState TempAllyGetState(void)
@@ -170,16 +174,40 @@ void BS_TempAllyInitialize(void)
     gHealthboxSpriteIds[battler] = CreateBattlerHealthboxSprites(battler);
     InitBattlerHealthboxCoords(battler);
     UpdateHealthboxAttribute(gHealthboxSpriteIds[battler], GetBattlerMon(battler), HEALTHBOX_ALL);
-    // Existing battlers move to their doubles coordinates (their healthbox frames were re-loaded above).
+    // The player's left battler now uses doubles coordinates. Its singles-template healthbox cannot be
+    // re-framed in place, so rebuild it; the opposing battler keeps its singles layout (one opposing party mon).
+    RebuildBattlerHealthbox(GetBattlerAtPosition(B_POSITION_PLAYER_LEFT));
     for (u32 other = 0; other < B_POSITION_PLAYER_RIGHT; other++)
     {
-        if (IsBattlerSpritePresent(other))
+        if (other != B_POSITION_PLAYER_LEFT)
         {
-            gSprites[gBattlerSpriteIds[other]].x = GetBattlerSpriteCoord(other, BATTLER_COORD_X_2);
-            gSprites[gBattlerSpriteIds[other]].y = GetBattlerSpriteDefault_Y(other);
+            InitBattlerHealthboxCoords(other);
+            UpdateHealthboxAttribute(gHealthboxSpriteIds[other], GetBattlerMon(other), HEALTHBOX_ALL);
         }
-        InitBattlerHealthboxCoords(other);
-        UpdateHealthboxAttribute(gHealthboxSpriteIds[other], GetBattlerMon(other), HEALTHBOX_ALL);
+        if (IsBattlerSpritePresent(other))
+            gSprites[gBattlerSpriteIds[other]].y = GetBattlerSpriteDefault_Y(other);
+    }
+    gBattlescriptCurrInstr = cmd->nextInstr;
+}
+
+// Assembly-only native, repeated every frame like BS_TxRollbackSlideCaster: advance the player's existing
+// battler two pixels per frame to its doubles X before the ally arrives, keeping its animation state.
+void BS_TempAllySlideBattlers(void)
+{
+    NATIVE_ARGS();
+    u32 battler = GetBattlerAtPosition(B_POSITION_PLAYER_LEFT);
+    u32 spriteId = gBattlerSpriteIds[battler];
+
+    if (IsBattlerSpritePresent(battler) && spriteId < MAX_SPRITES && gSprites[spriteId].inUse)
+    {
+        struct Sprite *sprite = &gSprites[spriteId];
+        s16 targetX = GetBattlerSpriteCoord(battler, BATTLER_COORD_X_2);
+
+        if (sprite->x != targetX)
+        {
+            sprite->x = sprite->x < targetX ? min(sprite->x + 2, targetX) : max(sprite->x - 2, targetX);
+            return; // Re-run this command next frame.
+        }
     }
     gBattlescriptCurrInstr = cmd->nextInstr;
 }
@@ -191,4 +219,70 @@ void BS_TempAllyFinishEntry(void)
     gBattleStruct->battlerState[B_POSITION_PLAYER_RIGHT].noOrderChange = TRUE;
     TempAllySetState(TEMP_ALLY_ACTIVE);
     gBattlescriptCurrInstr = cmd->nextInstr;
+}
+
+// Ball-less entrance: the ally zips in from the left screen edge, fast at first and easing into place.
+// Send-out contract (see kazuradrop_entrance.c): gDoingBattleAnim and ballAnimActive stay TRUE while it
+// runs, the sprite ends visible in BATTLER_AFFINE_NORMAL, the controller's wait-sprite ends at
+// SpriteCallbackDummy, and both flags are cleared at the end. No ball graphics were loaded for the ally,
+// so none are freed.
+#define TEMP_ALLY_ZIP_START_X   (-40)
+#define TEMP_ALLY_ZIP_MIN_STEP  3
+#define TEMP_ALLY_ZIP_MAX_STEP  14
+#define TEMP_ALLY_ZIP_HOLD      12
+
+static void Task_TempAllyZipIn(u8 taskId)
+{
+    s16 *data = gTasks[taskId].data;
+    u32 battler = data[0];
+    struct Sprite *mon = &gSprites[gBattlerSpriteIds[battler]];
+
+    switch (data[2])
+    {
+    case 0:
+        data[3] = mon->x; // target X, already set at creation
+        mon->x = TEMP_ALLY_ZIP_START_X;
+        mon->invisible = FALSE;
+        StartSpriteAffineAnim(mon, BATTLER_AFFINE_NORMAL);
+        PlaySE(SE_M_SWIFT);
+        data[2] = 1;
+        break;
+    case 1:
+    {
+        s32 step = (data[3] - mon->x) / 4;
+
+        step = max(TEMP_ALLY_ZIP_MIN_STEP, min(step, TEMP_ALLY_ZIP_MAX_STEP));
+        mon->x += step;
+        if (mon->x >= data[3])
+        {
+            mon->x = data[3];
+            PlayCry_ByMode(GetBattlerVisualSpecies(battler), -25, CRY_MODE_NORMAL);
+            data[1] = 0;
+            data[2] = 2;
+        }
+        break;
+    }
+    case 2:
+        if (++data[1] >= TEMP_ALLY_ZIP_HOLD)
+        {
+            gSprites[gBattleControllerData[battler]].callback = SpriteCallbackDummy;
+            gDoingBattleAnim = FALSE;
+            gBattleSpritesDataPtr->healthBoxesData[battler].ballAnimActive = FALSE;
+            DestroyTask(taskId);
+        }
+        break;
+    }
+}
+
+u8 DoTempAllyZipInAnimation(u32 battler)
+{
+    u8 taskId;
+
+    gDoingBattleAnim = TRUE;
+    gBattleSpritesDataPtr->healthBoxesData[battler].ballAnimActive = TRUE;
+    taskId = CreateTask(Task_TempAllyZipIn, 5);
+    gTasks[taskId].data[0] = battler;
+    gTasks[taskId].data[1] = 0;
+    gTasks[taskId].data[2] = 0;
+    return 0;
 }
