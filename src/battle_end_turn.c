@@ -282,10 +282,15 @@ static bool32 HandleEndTurnFutureSight(enum BattlerId battler)
         gCurrentMove = gBattleStruct->futureSight[battler].move;
         gBattleStruct->eventState.atkCanceler = CANCELER_TARGET_FAILURE;
 
+        // This is a new impact, not a continuation of the last chosen move.
+        // A benched source uses the existing party-damage rules (no abilities),
+        // and must not inherit another action's dynamic type.
+        gBattleStruct->dynamicMoveType = TYPE_NONE;
         if (IsFutureSightAttackerInParty(gBattlerAttacker, gBattlerTarget))
             gSpecialStatuses[gBattlerAttacker].attackerInParty = TRUE;
         else
             SetTypeBeforeUsingMove(gCurrentMove, gBattlerAttacker, GetBattlerAbility(gBattlerAttacker), GetBattlerHoldEffect(gBattlerAttacker));
+        gBattleStruct->futureSight[battler].resolvedType = GetBattleMoveType(gCurrentMove);
 
         gBattleScripting.animTurn = 1; // to play correct anim
         BattleScriptCall(BattleScript_MonTookFutureAttack);
@@ -1461,6 +1466,13 @@ static bool32 HandleEndTurnBugSpaceDecay(enum BattlerId battler)
     if (!gBattleStruct->bugSpace.active)
         return effect;
 
+    if (!BugSpaceHasDoomClock())
+    {
+        effect = BugSpaceCrushBoosts();
+        gBattleStruct->eventState.endTurnBattler = gBattlersCount;
+        return effect;
+    }
+
     // Don't decay if already at floor
     if (gBattleStruct->bugSpace.bpThreshold == 0)
         return effect;
@@ -1490,7 +1502,7 @@ static bool32 HandleEndTurnBugSpaceDecay(enum BattlerId battler)
 
 
     // Check if tier changed (for potential announcements)
-    if (oldTier != gBattleStruct->bugSpace.currentTier)
+    if (oldTier != gBattleStruct->bugSpace.currentTier && BugSpaceIsKazuradrop())
     {
         switch (gBattleStruct->bugSpace.currentTier)
     {
@@ -1508,46 +1520,7 @@ static bool32 HandleEndTurnBugSpaceDecay(enum BattlerId battler)
     }
         effect = TRUE;
     }
-    // gBattleMons[0].maxHP = gBattleStruct->bugSpace.bpThreshold;
-    // Halve positive stat stages for all battlers opposing Kazuradrop
-    {
-        bool32 statsLowered = FALSE;
-        u32 firstAffected = MAX_BATTLERS_COUNT;
-        for (u32 i = 0; i < gBattlersCount; i++)
-        {
-            // Skip battlers on Kazuradrop's side
-            if (GetBattlerSide(i) == GetBattlerSide(gBattleStruct->bugSpace.sourceBattler))
-                continue;
-
-            // Halve each positive stat boost (round down, floor at 0)
-            for (u32 j = 0; j < NUM_BATTLE_STATS; j++)
-            {
-                if (gBattleMons[i].statStages[j] > DEFAULT_STAT_STAGE)
-                {
-                    s32 boost = gBattleMons[i].statStages[j] - DEFAULT_STAT_STAGE;
-                    boost /= 2; // halve, round down (boost is positive here)
-                    gBattleMons[i].statStages[j] = DEFAULT_STAT_STAGE + boost;
-                    statsLowered = TRUE;
-                    if (firstAffected == MAX_BATTLERS_COUNT)
-                        firstAffected = i;
-                }
-            }
-        }
-        // Show animation and message if any stats were lowered
-        if (statsLowered)
-        {
-            gBattlerTarget = firstAffected;
-            gBattleScripting.battler = firstAffected;
-            if (!FlagGet(FLAG_TEMP_1))
-            {
-                BattleScriptCall(BattleScript_BugSpaceStatDecayFirst);
-                FlagSet(FLAG_TEMP_1);
-            }
-            else 
-                BattleScriptCall(BattleScript_BugSpaceStatDecay);
-            effect = TRUE;
-        }
-    }
+    effect |= BugSpaceCrushBoosts();
 
     gBattleStruct->eventState.endTurnBattler = gBattlersCount;
     return effect;
@@ -1560,7 +1533,7 @@ static bool32 HandleEndTurnBugSpacePassiveOHKO(enum BattlerId battler)
 
     gBattleStruct->eventState.endTurnBattler++;
 
-    if (!gBattleStruct->bugSpace.active)
+    if (!BugSpaceIsKazuradrop())
         return effect;
 
     // Only trigger if at passive OHKO tier
@@ -1601,7 +1574,7 @@ static bool32 HandleEndTurnMeltVirus(enum BattlerId battler)
         if (IsBattlerAlive(attacker))
         {
             s32 damage = GetNonDynamaxMaxHP(battler) / 8;
-            if (gBattleStruct->bugSpace.active
+            if (BugSpaceHasDoomClock()
              && gBattleStruct->bugSpace.currentTier >= BUGSPACE_TIER_MINIMIZE)
             {
                 damage = GetNonDynamaxMaxHP(battler) / 4;

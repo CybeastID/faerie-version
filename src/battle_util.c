@@ -3710,8 +3710,6 @@ u32 AbilityBattleEffects(enum AbilityEffect caseID, enum BattlerId battler, enum
                     VarSet(VAR_TEMP_0, gBattleResults.battleTurnCounter);
                     FlagClear(FLAG_KAZU_LEGENDARY_PUNISH);
                     gBattleStruct->bugSpace.sourceBattler = battler;
-                    // DEADCODE (NOT COMPILED): thresholdPercent was an early percent-based design, replaced by the cmdFaintmon gate. Kept for posterity. And in case I wanted to use the idea for something else and an actual HP% based gate.
-                    // gBattleStruct->bugSpace.thresholdPercent = 50;
                     gBattleStruct->bugSpace.bpThreshold = 160;
                     gBattleStruct->bugSpace.bpDecayRate = 10;
                     gBattleStruct->bugSpace.bpDecayRatePhase2 = 15;
@@ -3728,7 +3726,7 @@ u32 AbilityBattleEffects(enum AbilityEffect caseID, enum BattlerId battler, enum
         default:
             break;
         }
-        if (gBattleStruct->bugSpace.active
+        if (BugSpaceIsKazuradrop()
          && GetBattlerSide(battler) == B_SIDE_PLAYER
          && !FlagGet(FLAG_KAZU_LEGENDARY_PUNISH)
          && GetKazuraLegendTier(battler) != 0)
@@ -7602,7 +7600,7 @@ static inline uq4_12_t GetMinimizeModifier(enum Move move, enum BattlerId battle
 {
     if (MoveIncreasesPowerToMinimizedTargets(move)
         && (gBattleMons[battlerDef].volatiles.minimize
-            || (gBattleStruct->bugSpace.active
+            || (BugSpaceHasDoomClock()
                 && gBattleStruct->bugSpace.currentTier == BUGSPACE_TIER_MINIMIZE
                 && GetBattlerSide(gBattlerAttacker) == GetBattlerSide(gBattleStruct->bugSpace.sourceBattler))))
         return UQ_4_12(2.0);
@@ -8268,7 +8266,7 @@ s32 GetAdjustedDamage(struct DamageContext *ctx, s32 damage)
         return damage; // No damage will be dealt
 
     // Preserve Bug Space's crushing tier before ordinary survival adjustment.
-    if (gBattleStruct->bugSpace.active
+    if (BugSpaceHasDoomClock()
      && gBattleStruct->bugSpace.currentTier == BUGSPACE_TIER_OHKO
      && MoveIncreasesPowerToMinimizedTargets(ctx->move)
      && GetBattlerSide(ctx->battlerAtk) == GetBattlerSide(gBattleStruct->bugSpace.sourceBattler))
@@ -8997,6 +8995,12 @@ bool32 TryRevertPartyMonFormChange(u32 partyIndex)
 bool32 TryBattleFormChange(enum BattlerId battler, enum FormChanges method, enum Ability ability)
 {
     struct Pokemon *mon = GetBattlerMon(battler);
+
+    // The encounter's charged form is independent of Plate/item refreshes.
+    // Cleanup still runs through its ordinary faint/end-battle paths.
+    if (method != FORM_CHANGE_END_BATTLE && method != FORM_CHANGE_FAINT
+     && KoankoArceusGetForm(battler) != SPECIES_NONE)
+        return FALSE;
 
     if (!CanBattlerFormChange(battler, method))
         return FALSE;
@@ -10722,7 +10726,7 @@ bool32 CanMoveSkipAccuracyCalc(struct BattleCalcValues *cv, u32 weather, enum Re
     {
         effect = TRUE;
     }
-    else if (gBattleStruct->bugSpace.active
+    else if (BugSpaceHasDoomClock()
      && gBattleStruct->bugSpace.currentTier == BUGSPACE_TIER_MINIMIZE
      && MoveIncreasesPowerToMinimizedTargets(cv->move)
      && GetBattlerSide(battlerAtk) == GetBattlerSide(gBattleStruct->bugSpace.sourceBattler))

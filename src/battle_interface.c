@@ -2786,8 +2786,13 @@ static void PrintOnAbilityPopUp(const u8 *str, u32 spriteId1, u32 spriteId2, u32
     }
 }
 
-static void PrintBattlerOnAbilityPopUp(enum BattlerId battler, u8 spriteId1, u8 spriteId2)
+static void FormatAbilityPopUpOwner(enum BattlerId battler, const u8 *ownerName)
 {
+    if (ownerName != NULL)
+    {
+        StringCopy(gStringVar1, ownerName);
+        return;
+    }
     u32 totalChar = 0, lastChar;
     struct Pokemon *illusionMon = GetIllusionMonPtr(battler);
 
@@ -2803,7 +2808,11 @@ static void PrintBattlerOnAbilityPopUp(enum BattlerId battler, u8 spriteId1, u8 
     StringAppend(gStringVar1, COMPOUND_STRING("'"));
     if (lastChar != CHAR_S && lastChar != CHAR_s)
         StringAppend(gStringVar1, COMPOUND_STRING("s"));
+}
 
+static void PrintBattlerOnAbilityPopUp(enum BattlerId battler, u8 spriteId1, u8 spriteId2, const u8 *ownerName)
+{
+    FormatAbilityPopUpOwner(battler, ownerName);
     u32 x;
     u32 y = 0;
     if (IsOnPlayerSide(battler))
@@ -2852,18 +2861,23 @@ bool32 IsAnyAbilityPopUpActive(void)
 
 void CreateAbilityPopUp(enum BattlerId battler, enum Ability ability, bool32 isDoubleBattle)
 {
+    if (gBattleScripting.abilityPopupOverwrite)
+        ability = gBattleScripting.abilityPopupOverwrite;
+    CreateAbilityPopUpWithName(battler, ability, isDoubleBattle, NULL);
+}
+
+void CreateAbilityPopUpWithName(enum BattlerId battler, enum Ability ability, bool32 isDoubleBattle, const u8 *ownerName)
+{
     u8 *spriteIds;
     u32 xSlide, tileTag;
     enum BattlerPosition battlerPosition = GetBattlerPosition(battler);
     struct SpriteTemplate template;
     const s16 (*coords)[2];
 
-    if (gBattleScripting.abilityPopupOverwrite)
-        ability = gBattleScripting.abilityPopupOverwrite;
-
     if (gTestRunnerEnabled)
     {
-        TestRunner_Battle_RecordAbilityPopUp(battler, ability);
+        FormatAbilityPopUpOwner(battler, ownerName);
+        TestRunner_Battle_RecordAbilityPopUp(battler, ability, gStringVar1);
         if (gTestRunnerHeadless)
             return;
     }
@@ -2909,7 +2923,7 @@ void CreateAbilityPopUp(enum BattlerId battler, enum Ability ability, bool32 isD
     gSprites[spriteIds[0]].sBattlerId = battler;
     gSprites[spriteIds[1]].sBattlerId = battler;
 
-    PrintBattlerOnAbilityPopUp(battler, spriteIds[0], spriteIds[1]);
+    PrintBattlerOnAbilityPopUp(battler, spriteIds[0], spriteIds[1], ownerName);
     PrintAbilityOnAbilityPopUp(ability, spriteIds[0], spriteIds[1]);
 }
 
@@ -3067,7 +3081,7 @@ void CreateItemPopUp(enum BattlerId battler)
     gSprites[spriteIds[0]].sBattlerId = battler;
     gSprites[spriteIds[1]].sBattlerId = battler;
 
-    PrintBattlerOnAbilityPopUp(battler, spriteIds[0], spriteIds[1]);
+    PrintBattlerOnAbilityPopUp(battler, spriteIds[0], spriteIds[1], NULL);
     PrintItemOnItemPopUp(gLastUsedItem, spriteIds[0], spriteIds[1]);
 }
 

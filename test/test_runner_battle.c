@@ -14,6 +14,7 @@
 #include "main.h"
 #include "palette.h"
 #include "sprite.h"
+#include "string_util.h"
 #include "task.h"
 #include "malloc.h"
 #include "party_menu.h"
@@ -927,7 +928,7 @@ static const void *BattleTest_RandomElementArray(enum RandomTag tag, const void 
     return RandomElementArrayDefaultValue(tag, array, size, count, caller);
 }
 
-static s32 TryAbilityPopUp(s32 i, s32 n, enum BattlerId battlerId, enum Ability ability)
+static s32 TryAbilityPopUp(s32 i, s32 n, enum BattlerId battlerId, enum Ability ability, const u8 *ownerName)
 {
     struct QueuedAbilityEvent *event;
     s32 iMax = i + n;
@@ -939,13 +940,14 @@ static s32 TryAbilityPopUp(s32 i, s32 n, enum BattlerId battlerId, enum Ability 
         event = &DATA.queuedEvents[i].as.ability;
 
         if (event->battlerId == battlerId
-         && (event->ability == ABILITY_NONE || event->ability == ability))
+         && (event->ability == ABILITY_NONE || event->ability == ability)
+         && (event->ownerName == NULL || StringCompare(event->ownerName, ownerName) == 0))
             return i;
     }
     return -1;
 }
 
-void TestRunner_Battle_RecordAbilityPopUp(enum BattlerId battlerId, enum Ability ability)
+void TestRunner_Battle_RecordAbilityPopUp(enum BattlerId battlerId, enum Ability ability, const u8 *ownerName)
 {
     s32 queuedEvent;
     s32 match;
@@ -959,7 +961,7 @@ void TestRunner_Battle_RecordAbilityPopUp(enum BattlerId battlerId, enum Ability
     {
     case QUEUE_GROUP_NONE:
     case QUEUE_GROUP_ONE_OF:
-        if (TryAbilityPopUp(DATA.trial.queuedEvent, event->groupSize, battlerId, ability) != -1)
+        if (TryAbilityPopUp(DATA.trial.queuedEvent, event->groupSize, battlerId, ability, ownerName) != -1)
         {
             DATA.trial.queuedEvent += event->groupSize;
         }
@@ -978,7 +980,7 @@ void TestRunner_Battle_RecordAbilityPopUp(enum BattlerId battlerId, enum Ability
         queuedEvent = DATA.trial.queuedEvent;
         do
         {
-            if ((match = TryAbilityPopUp(queuedEvent, event->groupSize, battlerId, ability)) != -1)
+            if ((match = TryAbilityPopUp(queuedEvent, event->groupSize, battlerId, ability, ownerName)) != -1)
             {
                 const char *filename = gTestRunnerState.test->filename;
                 u32 line = SourceLine(DATA.queuedEvents[match].sourceLineOffset);
@@ -995,7 +997,7 @@ void TestRunner_Battle_RecordAbilityPopUp(enum BattlerId battlerId, enum Ability
             if (event->groupType == QUEUE_GROUP_NONE_OF)
                 continue;
 
-            if (TryAbilityPopUp(queuedEvent, event->groupSize, battlerId, ability) != -1)
+            if (TryAbilityPopUp(queuedEvent, event->groupSize, battlerId, ability, ownerName) != -1)
                 DATA.trial.queuedEvent = queuedEvent + event->groupSize;
         } while (FALSE);
         break;
@@ -3702,6 +3704,7 @@ void QueueAbility(u32 sourceLine, struct BattlePokemon *battler, struct AbilityE
         .as = { .ability = {
             .battlerId = battlerId,
             .ability = ctx.ability,
+            .ownerName = ctx.ownerName,
         }},
     };
 }

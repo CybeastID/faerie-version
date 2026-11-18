@@ -48,7 +48,7 @@ static u16 GetMoveBasePowerForBugSpace(u32 move)
 static bool32 IsMoveBlockedByBugSpace(u32 move)
 {
     // If Bug Space is not active, don't block
-    if (!gBattleStruct->bugSpace.active)
+    if (!BugSpaceHasDoomClock())
         return FALSE;
     
     // Only block moves from Kazuradrop's opponents (one-sided effect)
@@ -78,9 +78,16 @@ static enum CancelerResult CancelerBugSpace(struct BattleCalcValues *cv)
         return CANCELER_RESULT_SUCCESS;
 
     gBattleStruct->moveResultFlags[gBattlerTarget] |= MOVE_RESULT_NO_EFFECT;
-    if (IsExplosionMove(cv->move))
+    // Explosion deliberately self-KOs earlier in the canceler. Kazuradrop
+    // answers the already-spent attack with Invincible and her existing taunt.
+    if (IsExplosionMove(cv->move) && BugSpaceIsKazuradrop())
         ShowInvincibleBattleStatusIcon(gBattlerTarget);
     gBattlerAbility = gBattleStruct->bugSpace.sourceBattler;
+    if (!BugSpaceIsKazuradrop())
+    {
+        gBattlescriptCurrInstr = BattleScript_KoankoArceusMoveBlocked;
+        return CANCELER_RESULT_FAILURE;
+    }
     if (gBattleStruct->bugSpace.currentTier == BUGSPACE_TIER_PASSIVE_OHKO)
         gBattlescriptCurrInstr = BattleScript_BugSpaceBlocked_POHKO;
     else if (!gBattleStruct->bugSpace.hasBlocked)
@@ -97,7 +104,7 @@ static bool32 TrashCrushInstantKnockout(struct BattleCalcValues *cv, enum Battle
 {
     if (cv->moveEffect != EFFECT_TRASH_CRUSH)
         return FALSE;
-    bool32 inBugSpace = gBattleStruct->bugSpace.active
+    bool32 inBugSpace = BugSpaceHasDoomClock()
         && GetBattlerSide(target) != GetBattlerSide(gBattleStruct->bugSpace.sourceBattler);
     if (inBugSpace && gBattleStruct->bugSpace.currentTier >= BUGSPACE_TIER_OHKO)
         return TRUE;

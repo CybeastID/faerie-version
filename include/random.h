@@ -265,6 +265,7 @@ enum RandomTag
     RNG_POLYMORPH,
     RNG_KOANKO_SMEARGLE_DRAW,
     RNG_KOANKO_SMEARGLE_TIE,
+    RNG_KOANKO_ARCEUS_FORM,
 };
 
 #define RandomWeighted(tag, ...) \

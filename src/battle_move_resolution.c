@@ -1694,6 +1694,7 @@ void SetFutureSightAttack(enum BattlerId attacker, enum BattlerId target, enum M
     future->battlerIndex = attacker;
     future->partyIndex = gBattlerPartyIndexes[attacker];
     future->counter = 3;
+    future->resolvedType = TYPE_NONE;
     gBattleCommunication[MULTISTRING_CHOOSER] = move == MOVE_DOOM_DESIRE
         ? B_MSG_DOOM_DESIRE : B_MSG_FUTURE_SIGHT;
 }
@@ -2722,7 +2723,7 @@ static enum CancelerResult CancelerDamageCalc(struct BattleCalcValues *cv)
         }
     }
 
-    if (gBattleStruct->bugSpace.active
+    if (BugSpaceHasDoomClock()
      && gBattleStruct->bugSpace.currentTier == BUGSPACE_TIER_OHKO
      && MoveIncreasesPowerToMinimizedTargets(cv->move)
      && GetBattlerSide(cv->battlerAtk) == GetBattlerSide(gBattleStruct->bugSpace.sourceBattler))
@@ -2849,7 +2850,8 @@ static enum CancelerResult CancelerMoveAnimation(struct BattleCalcValues *cv)
         gBattleScripting.animTurn = 1;
 
     u32 multiHit = gMultiHitCounter;
-    bool32 willDamageFaintBattler = (gBattleMons[cv->battlerDef].hp <= gBattleStruct->moveDamage[cv->battlerDef]);
+    bool32 willDamageFaintBattler = (gBattleMons[cv->battlerDef].hp
+        <= KoankoArceusClampHpLoss(cv->battlerDef, gBattleStruct->moveDamage[cv->battlerDef]));
     if (!gBattleMons[cv->battlerDef].volatiles.substitute && willDamageFaintBattler)
         multiHit = 1;
 
@@ -3013,6 +3015,7 @@ static enum CancelerResult CancelerHealthBarUpdate(struct BattleCalcValues *cv)
          || DoesIceFaceBlockMove(battlerDef, cv->move))
             continue;
 
+        KoankoArceusClampMoveDamage(battlerDef);
         s32 dmgUpdate = min(gBattleStruct->moveDamage[battlerDef], 10000);
         BtlController_EmitHealthBarUpdate(battlerDef, B_COMM_TO_CONTROLLER, dmgUpdate);
         MarkBattlerForControllerExec(battlerDef);
@@ -3064,6 +3067,7 @@ static bool32 TryMoveDamageUpdate(struct BattleCalcValues *cv)
     }
     else
     {
+        KoankoArceusClampMoveDamage(cv->battlerDef);
         if (gBattleStruct->moveDamage[cv->battlerDef] < 0)
         {
             // Negative damage is HP gain
@@ -3109,6 +3113,10 @@ static bool32 TryMoveDamageUpdate(struct BattleCalcValues *cv)
                     return TRUE;
                 }
                 gBattleMons[cv->battlerDef].hp = 0;
+                enum Type breakType = GetBattleMoveType(cv->move);
+                if (cv->moveEffect == EFFECT_FUTURE_SIGHT)
+                    breakType = gBattleStruct->futureSight[cv->battlerDef].resolvedType;
+                KoankoArceusOnHpUpdate(cv->battlerDef, hpBefore, cv->battlerAtk, breakType);
                 QueueBreakBar(cv->battlerDef);
             }
 
@@ -3748,6 +3756,8 @@ static enum MoveEndResult MoveEndFaintBlock(struct BattleCalcValues *cv)
             gBattleStruct->eventState.moveEndBlock++;
             break;
         case FAINT_BLOCK_CHECK_TARGET_FAINTED: // Stop if target already ran the block / is alive or absent
+            if (KoankoArceusRepairFaint(cv->battlerDef))
+                return MOVEEND_RESULT_RUN_SCRIPT; // Retry after the HP snap controller finishes.
             if (QueueBreakBar(cv->battlerDef)
              || IsBreakBarPending(cv->battlerDef)
              || IsBattlerAlive(cv->battlerDef)
@@ -5739,8 +5749,7 @@ static enum MoveResult StatChangeBeforeChange(struct BattleCalcValues *cv)
         break;
     case EFFECT_MEMENTO:
         gBattleStruct->passiveHpUpdate[cv->battlerAtk] = gBattleMons[cv->battlerAtk].hp;
-        BtlController_EmitHealthBarUpdate(cv->battlerAtk, B_COMM_TO_CONTROLLER, INSTANT_HP_BAR_DROP);
-        MarkBattlerForControllerExec(cv->battlerAtk);
+        KoankoArceusEmitHpDrop(cv->battlerAtk);
         BattleScriptCall(BattleScript_Memento);
         return MOVE_RESULT_RUN_SCRIPT_INCREMENT;
         break;

@@ -22,6 +22,8 @@ void DestroyBugSpacePanel(u32 battler);
 
 // Call at transformation — panel slides back in
 void TriggerBugSpacePanelSlideIn(u32 battler);
+bool32 IsBugSpacePanelSliding(u32 battler);
+void BS_WaitBugSpacePanelSlide(void);
 
 // ---------------------------------------------------------------
 // BS_callable wrappers

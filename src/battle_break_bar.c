@@ -640,7 +640,8 @@ bool32 TryBreakBar(u32 battler, const u8 *returnInstr)
     const u8 *onScript = config->phases[phase].onBreakScript;
     const u8 *afterScript = (savedLayer && !coverScripts) ? NULL : config->phases[phase].afterBreakScript;
     bool32 pushOnScript = coverScripts && onScript != NULL; // NULL on a covering layer is "nothing", never a refill
-    u32 scriptCount = 2 + (afterScript != NULL) + pushOnScript;
+    const u8 *adaptScript = KoankoArceusGetBreakScript(battler, phase);
+    u32 scriptCount = 2 + (afterScript != NULL) + pushOnScript + (adaptScript != NULL);
     // Preserve the original target while phase scripts operate on the bar owner.
     if (gBattleStruct->savedTargetCount >= ARRAY_COUNT(gBattleStruct->savedBattlerTarget)
      || gBattleResources->battleScriptsStack->size + scriptCount
@@ -649,6 +650,8 @@ bool32 TryBreakBar(u32 battler, const u8 *returnInstr)
     SaveBattlerTarget(gBattlerTarget);
     gBattlerTarget = battler;
 
+    if (adaptScript != NULL)
+        KoankoArceusCommitBreak(battler);
     owner->breakBarPending = FALSE;
     owner->breakBarsRemaining--;
     TrimCoverScripts(owner);
@@ -659,6 +662,8 @@ bool32 TryBreakBar(u32 battler, const u8 *returnInstr)
         BattleScriptPush(afterScript);
     if (pushOnScript)
         BattleScriptPush(onScript);
+    if (adaptScript != NULL)
+        BattleScriptPush(adaptScript);
     gBattlescriptCurrInstr = savedLayer ? BattleScript_RestoreSavedBreakBar : onScript;
     if (gBattlescriptCurrInstr == NULL)
         gBattlescriptCurrInstr = BattleScript_BreakBarRefill;

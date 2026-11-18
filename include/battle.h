@@ -204,6 +204,7 @@ enum BugSpaceThresholdTier
 #define TX_ARCANUM_SLOT_METEO 1
 
 #include "battle_tx_rollback.h"
+#include "battle_bug_space.h"
 
 struct CastoriaBattleData
 {
@@ -221,7 +222,7 @@ struct CastoriaBattleData
 struct BugSpaceData
 {
     u8 active;                    // 0 = off, 1 = on
-    u8 thresholdPercent;          // X% HP trigger point, configurable at runtime. Currently unused.
+    u8 mode;                     // enum BugSpaceMode; replaces unused thresholdPercent.
     u8 sourceBattler;             // Battler that most recently triggered a phase
     u16 bpThreshold;              // Current BP threshold - moves at or above this fail
     u16 bpDecayRate;              // Current decay rate per turn
@@ -553,6 +554,7 @@ struct FutureSight
     u16 counter:10;
     u16 battlerIndex:3;
     u16 partyIndex:3;
+    enum Type resolvedType; // Resolved at impact before yielding to the attack script.
 };
 
 struct SleepClause
@@ -658,6 +660,7 @@ struct EventStates
 
 // Cleared at the beginning of the battle. Fields need to be cleared when needed manually otherwise.
 #include "battle_reduction.h"
+#include "battle_koanko.h"
 
 struct BattleStruct
 {
@@ -671,6 +674,7 @@ struct BattleStruct
     struct BattlerState battlerState[MAX_BATTLERS_COUNT];
     struct PartyState partyState[MAX_BATTLE_TRAINERS][PARTY_SIZE];
     u8 koankoPhase; // enum KoankoPhase; encounter-owned, survives graphics reloads.
+    struct KoankoArceusState koankoArceus;
     struct EventStates eventState;
     struct FutureSight futureSight[MAX_BATTLERS_COUNT];
     struct Wish wish[MAX_BATTLERS_COUNT];

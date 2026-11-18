@@ -165,6 +165,8 @@ void ConjureKoankoTeam(void)
     for (u32 slot = 0; slot < PARTY_SIZE; slot++)
     {
         TryFormChange(&gParties[B_TRAINER_OPPONENT_A][slot], FORM_CHANGE_BEGIN_BATTLE, B_TRAINER_OPPONENT_A);
+        if (GET_BASE_SPECIES_ID(GetMonData(&gParties[B_TRAINER_OPPONENT_A][slot], MON_DATA_SPECIES)) == SPECIES_ARCEUS_NORMAL)
+            gBattleStruct->partyState[B_TRAINER_OPPONENT_A][slot].entryScript = &gKoankoArceusEntry;
         gBattleStruct->itemLost[B_TRAINER_OPPONENT_A][slot].originalItem = GetMonData(&gParties[B_TRAINER_OPPONENT_A][slot], MON_DATA_HELD_ITEM);
     }
     gPartiesCount[B_TRAINER_OPPONENT_A] = CalculatePartyCount(B_TRAINER_OPPONENT_A);
@@ -303,6 +305,7 @@ void BS_ConjureKoankoTeam(void)
 // guard only blocks when the occupant is still alive.
 void KoankoOnSwitchIn(u32 battler)
 {
+    KoankoArceusOnSwitchIn(battler);
     if (gBattleStruct != NULL
      && gBattleStruct->koankoPhase == KOANKO_CONJURED_TEAM
      && GetBattlerSide(battler) == B_SIDE_OPPONENT)

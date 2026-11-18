@@ -6767,6 +6767,7 @@ BattleScript_BugSpaceStatDecayFirst::
 
 BattleScript_BugSpaceStatDecay::
 	call BattleScript_AbilityPopUp
+BattleScript_KoankoArceusStatDecay::
 	playanimation BS_TARGET, B_ANIM_STATS_CHANGE
 	waitanimation
 	printstring STRINGID_BUGSPACESTATDECAY
@@ -6778,6 +6779,13 @@ BattleScript_KazuradropGutsProc::
     waitmessage B_WAIT_TIME_LONG
 	kazuradialogue STRINGID_KAZURADROP_GUTS2
     return
+
+BattleScript_KoankoArceusMoveBlocked::
+    printstring STRINGID_BUGSPACEMOVEBLOCKED
+    waitmessage B_WAIT_TIME_LONG
+    goto BattleScript_MoveEnd
+
+    .include "data/battle_scripts_koanko_arceus.inc"
 @ CASTORIA FIGHT SCRIPTS
 BattleScript_CastoriaNameTheft::
 	printstring STRINGID_CASTORIA_ASKS_NAME

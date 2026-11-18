@@ -417,9 +417,11 @@
  *     ABILITY_POPUP(player, ABILITY_STURDY);
  *     MESSAGE("Geodude was protected by Sturdy!");
  *
- * ABILITY_POPUP(battler, [ability])
+ * ABILITY_POPUP(battler, [ability], [ownerName:])
  * Causes the test to fail if the battler's ability pop-up is not shown.
  * If specified, ability is the ability shown in the pop-up.
+ * ownerName optionally matches the exact rendered owner label, including its
+ * possessive suffix, e.g. ownerName: COMPOUND_STRING("Alter Ego's").
  *     ABILITY_POPUP(opponent, ABILITY_MOLD_BREAKER);
  *
  * ANIMATION(type, animId, [battler], [target:])
@@ -621,6 +623,7 @@ struct QueuedAbilityEvent
 {
     enum BattlerId battlerId;
     enum Ability ability;
+    const u8 *ownerName; // Optional exact rendered owner label, including possessive.
 };
 
 
@@ -1293,6 +1296,7 @@ struct EffectivenessEventContext
 struct AbilityEventContext
 {
     enum Ability ability;
+    const u8 *ownerName;
 };
 
 struct ItemEventContext

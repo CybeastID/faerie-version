@@ -3088,6 +3088,7 @@ void SwitchInClearSetData(enum BattlerId battler, struct Volatiles *volatilesCop
 
 void FaintClearSetData(enum BattlerId battler)
 {
+    KoankoArceusOnFaint(battler);
     ReductionResetOccupant(battler);
     TempAllyOnFaint(battler);
     TxRollbackOnFaint(battler);
@@ -3702,6 +3703,9 @@ bool32 EndTurnEvents(void) // Called from Battle Script
     if (DoEndTurnEffects())
         return TRUE;
 
+    KoankoArceusOnEndTurn();
+    if (KoankoArceusTryOvercharge())
+        return TRUE;
     gBattleStruct->eventState.faintedAction = 0;
 
     TurnValuesCleanUp(FALSE);
@@ -3882,6 +3886,7 @@ static void HandleTurnActionSelectionState(void)
 {
     s32 i;
 
+    KoankoArceusOnCommandSelection();
     gBattleCommunication[ACTIONS_CONFIRMED_COUNT] = 0;
 
     // Castoria True Name Command — AI pre-pass
@@ -5880,6 +5885,12 @@ enum Type GetDynamicMoveType(struct Pokemon *mon, enum Move move, enum BattlerId
         }
         break;
     case EFFECT_CHANGE_TYPE_ON_ITEM:
+        if (move == MOVE_JUDGMENT)
+        {
+            enum Species form = KoankoArceusGetForm(battler);
+            if (form != SPECIES_NONE && (state == MON_IN_BATTLE || mon == GetBattlerMon(battler)))
+                return GetSpeciesType(form, 0);
+        }
         if (holdEffect == GetMoveEffectArg_HoldEffect(move))
             return GetItemSecondaryId(heldItem);
         break;

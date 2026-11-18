@@ -152,6 +152,9 @@ u8 GetScaledHPFraction(s16 hp, s16 maxhp, u8 scale);
 u8 GetHPBarLevel(s16 hp, s16 maxhp);
 bool32 IsAnyAbilityPopUpActive(void);
 void CreateAbilityPopUp(enum BattlerId battlerId, enum Ability ability, bool32 isDoubleBattle);
+// Explicit presentation only; ownerName includes its possessive suffix, or NULL
+// selects the ordinary nickname. Does not consult abilityPopupOverwrite.
+void CreateAbilityPopUpWithName(enum BattlerId battlerId, enum Ability ability, bool32 isDoubleBattle, const u8 *ownerName);
 void DestroyAbilityPopUp(enum BattlerId battlerId);
 bool32 CanThrowLastUsedBall(void);
 void TryHideLastUsedBall(void);

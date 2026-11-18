@@ -2,10 +2,13 @@
 #include "test/battle.h"
 #include "battle_koanko.h"
 #include "battle_koanko_smeargle.h"
+#include "battle_temp_ally.h"
 #include "battle_setup.h"
 #include "data.h"
 #include "malloc.h"
 #include "trainer_break_bars.h"
+
+static s32 ScoreKoankoLeadBoomburst(u32 battler, u16 move);
 
 TEST("Koanko replacement creates fresh opponents while preserving player, field, inventory and trainer identity")
 {
@@ -51,9 +54,16 @@ TEST("Koanko replacement creates fresh opponents while preserving player, field,
         EXPECT_EQ(GetMonData(&gParties[B_TRAINER_OPPONENT_A][i], MON_DATA_TERA_TYPE), i == 2 ? TYPE_FIRE : TYPE_MYSTERY);
         EXPECT_EQ(GetMonData(&gParties[B_TRAINER_OPPONENT_A][i], MON_DATA_DYNAMAX_LEVEL), BLOCK_AI_DYNAMAX);
         EXPECT_EQ((u32)gBattleStruct->partyState[B_TRAINER_OPPONENT_A][i].isKnockedOff, FALSE);
-        EXPECT_EQ(gBattleStruct->partyState[B_SIDE_OPPONENT][i].breakBarConfig, NULL);
+        // Regeneration removes the old five-layer profile, then installs the
+        // current production Calyrex/Eternatus phase bars. Those are not stale.
+        const struct BreakBarConfig *config = ResolveTrainerBreakBar(&gKoankoConjuredBreakBars, species[i], i);
+        EXPECT_EQ(gBattleStruct->partyState[B_SIDE_OPPONENT][i].breakBarConfig, config);
+        EXPECT_EQ((u32)gBattleStruct->partyState[B_SIDE_OPPONENT][i].breakBarsRemaining,
+                  config == NULL ? 0 : GetInitialBreakBarCount(config));
         EXPECT_EQ(gBattleStruct->partyState[B_SIDE_OPPONENT][i].breakBarSavedMaxHp[0], 0);
         EXPECT_EQ((u32)gBattleStruct->partyState[B_SIDE_OPPONENT][i].breakBarItemUsed, FALSE);
+        EXPECT_EQ(gBattleStruct->partyState[B_TRAINER_OPPONENT_A][i].entryScript,
+                  i == PARTY_SIZE - 1 ? &gKoankoArceusEntry : NULL);
         EXPECT_EQ((u32)gAiPartyData->mons[B_SIDE_OPPONENT][i].isFainted, FALSE);
     }
     EXPECT_EQ(gBattleStruct->koankoPhase, KOANKO_CONJURED_TEAM);
@@ -73,6 +83,11 @@ TEST("Koanko replacement creates fresh opponents while preserving player, field,
     EXPECT_EQ((u32)gBattleStruct->futureSight[B_POSITION_OPPONENT_LEFT].counter, 2);
     EXPECT_EQ(gBattleResults.opponentFaintCounter, 6);
     EXPECT_EQ(gPartiesCount[B_TRAINER_OPPONENT_A], 6);
+    // Stage 08 uses the existing move and production Dialga kit unchanged.
+    EXPECT_EQ(GetMonData(&gParties[B_TRAINER_OPPONENT_A][4], MON_DATA_MOVE1), MOVE_ROAR_OF_ETERNITY);
+    EXPECT_EQ(GetMonData(&gParties[B_TRAINER_OPPONENT_A][4], MON_DATA_MOVE2), MOVE_FLASH_CANNON);
+    EXPECT_EQ(GetMonData(&gParties[B_TRAINER_OPPONENT_A][4], MON_DATA_MOVE3), MOVE_EARTH_POWER);
+    EXPECT_EQ(GetMonData(&gParties[B_TRAINER_OPPONENT_A][4], MON_DATA_MOVE4), MOVE_THUNDERBOLT);
     // A second call cannot regenerate a defeated conjured Pokemon.
     u16 hp = 0;
     SetMonData(&gParties[B_TRAINER_OPPONENT_A][0], MON_DATA_HP, &hp);
@@ -92,20 +107,36 @@ TEST("Koanko replacement creates fresh opponents while preserving player, field,
     gBattleStruct = NULL;
 }
 
-SINGLE_BATTLE_TEST("Koanko conjures a second team and victory requires twelve genuine faints")
+AI_SINGLE_BATTLE_TEST("Koanko conjures a second team and victory requires twelve genuine faints")
 {
     gBattleTestRunnerState->data.recordedBattle.opponentA = TRAINER_KOANKO;
     GIVEN {
-        PLAYER(SPECIES_HERACROSS) { Attack(9999); Speed(9999); Ability(ABILITY_SKILL_LINK); Moves(MOVE_ARM_THRUST); }
+        AI_FLAGS(AI_FLAG_SEQUENCE_SWITCHING);
+        Test_SetKoankoSmeargleScorer(ScoreKoankoLeadBoomburst);
+        // Icicle Spear breaks Focus Sash and can hit Shadow Rider. Feint makes
+        // TX's Protect choice irrelevant to this lifecycle fixture. Extra HP
+        // keeps the boss's action after a form-bar break from ending the run.
+        PLAYER(SPECIES_HERACROSS) {
+            Level(MAX_LEVEL); Attack(9999); Speed(9999); Defense(9999); SpDefense(9999);
+            HP(9999); MaxHP(9999); Ability(ABILITY_SKILL_LINK); Moves(MOVE_ICICLE_SPEAR, MOVE_FEINT);
+        }
         for (u32 i = 0; i < PARTY_SIZE; i++)
             OPPONENT(SPECIES_WOBBUFFET) { HP(1); Speed(50); Moves(MOVE_CELEBRATE); }
     } WHEN {
         for (u32 i = 1; i < PARTY_SIZE; i++)
-            TURN { MOVE(player, MOVE_ARM_THRUST); SEND_OUT(opponent, i); }
-        TURN { MOVE(player, MOVE_ARM_THRUST); SEND_OUT(opponent, 0); }
-        for (u32 i = 1; i < PARTY_SIZE; i++)
-            TURN { MOVE(player, MOVE_ARM_THRUST); SEND_OUT(opponent, i); }
-        TURN { MOVE(player, MOVE_ARM_THRUST); }
+            TURN { MOVE(player, MOVE_ICICLE_SPEAR); EXPECT_SEND_OUT(opponent, i); }
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); EXPECT_SEND_OUT(opponent, 0); }
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); EXPECT_SEND_OUT(opponent, 1); } // Smeargle, including Sash.
+        TURN { MOVE(player, MOVE_FEINT); EXPECT_SEND_OUT(opponent, 2); } // Solo TX.
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); } // Ice Rider's bar -> Shadow Rider, no faint/send-out.
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); EXPECT_SEND_OUT(opponent, 3); }
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); } // Eternatus's bar -> Eternamax and ally entry.
+        SUMMONED_ALLY();
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); EXPECT_SEND_OUT(opponent, 4); } // Genuine faint, ally leaves.
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); EXPECT_SEND_OUT(opponent, 5); }
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); } // Arceus's protected full turn, then overcharge.
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); } // Saved layers resolve after all hits, protecting the restored base.
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); } // Genuine Arceus faint after its single adaptation.
     } SCENE {
         for (u32 i = 0; i < PARTY_SIZE; i++)
             MESSAGE("The opposing Wobbuffet fainted!");
@@ -122,6 +153,10 @@ SINGLE_BATTLE_TEST("Koanko conjures a second team and victory requires twelve ge
         EXPECT_EQ(gBattleStruct->koankoPhase, KOANKO_CONJURED_TEAM);
         EXPECT_EQ(TRAINER_BATTLE_PARAM.opponentA, TRAINER_KOANKO);
         EXPECT_EQ(gBattleOutcome, B_OUTCOME_WON);
+        EXPECT_EQ(gBattlersCount, 2);
+        EXPECT_EQ(TempAllyGetState(), TEMP_ALLY_NONE);
+    } AFTER_CLEANUP {
+        Test_SetKoankoSmeargleScorer(NULL);
     }
 }
 

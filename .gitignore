@@ -109,3 +109,4 @@ docs/mechanics/temporary_ally.md
 docs/extra docs/*.sha256
 docs/extra docs/validate_break_bar_examples.py
 docs/extra docs/verify_break_bar_release_diagnostics.py
+.stage09-draft/*

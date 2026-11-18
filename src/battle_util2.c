@@ -84,6 +84,7 @@ void AllocateBattleResources(void)
 
 void FreeBattleResources(void)
 {
+    KoankoArceusFinishBattle();
     TempAllyFinishBattle();
     TrainerBreakBarsClearPending();
     BattleEntryScriptsClear();

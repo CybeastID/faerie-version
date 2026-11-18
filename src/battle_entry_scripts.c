@@ -203,6 +203,13 @@ static bool32 StartScript(u32 battler, const u8 *script, bool32 opening)
     return TRUE;
 }
 
+bool32 TryRunBattleEventScript(u32 battler, const u8 *script)
+{
+    if (gBattleControllerExecFlags || battler >= gBattlersCount)
+        return FALSE;
+    return StartScript(battler, script, FALSE);
+}
+
 bool32 TryRunMonEntryScript(u32 battler)
 {
     if (battler >= gBattlersCount || !gBattleStruct->battlerState[battler].switchIn || !IsBattlerAlive(battler))

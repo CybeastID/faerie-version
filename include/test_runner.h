@@ -13,7 +13,7 @@ extern const bool8 gTestRunnerSkipIsFail;
 
 enum Gimmick;
 
-void TestRunner_Battle_RecordAbilityPopUp(enum BattlerId battlerId, enum Ability ability);
+void TestRunner_Battle_RecordAbilityPopUp(enum BattlerId battlerId, enum Ability ability, const u8 *ownerName);
 void TestRunner_Battle_RecordItemPopUp(enum BattlerId battlerId, enum Item item);
 void TestRunner_Battle_RecordAnimation(u32 animType, u32 animId);
 void TestRunner_Battle_RecordHP(enum BattlerId battlerId, u32 oldHP, u32 newHP);

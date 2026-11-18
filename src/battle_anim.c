@@ -435,7 +435,7 @@ void LaunchBattleAnimation(u32 animType, u32 animId)
         break;
     case ANIM_TYPE_MOVE:
         if (animId == MOVE_HURRICANE
-         && gBattleStruct->bugSpace.active
+         && BugSpaceIsKazuradrop()
          && gBattleStruct->bugSpace.currentTier == BUGSPACE_TIER_PASSIVE_OHKO)
             sBattleAnimScriptPtr = gBattleAnimMove_HurricaneThrowOut;
         else

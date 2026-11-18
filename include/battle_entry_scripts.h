@@ -57,6 +57,9 @@ void BattleEntryScriptsClear(void);
 bool32 BattleEntryScriptsConfigured(void);
 bool32 TryRunMonEntryScript(u32 battler);
 bool32 TryRunTurnZeroScript(void);
+// Returning event payload; reuses entry context preservation without consuming
+// an entry run or creating an opening callback. Caller owns event timing/latch.
+bool32 TryRunBattleEventScript(u32 battler, const u8 *script);
 bool32 HandleOpeningScriptFaints(void);
 void FinishOpeningScriptFaints(void);
 void BS_CallConfiguredEntryScript(void);

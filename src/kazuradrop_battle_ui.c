@@ -2,6 +2,7 @@
 #include "global.h"
 #include "battle_script_native.h"
 #include "battle.h"
+#include "battle_util.h"
 #include "battle_interface.h"
 #include "battle_gimmick.h"
 #include "battle_controllers.h"
@@ -315,7 +316,7 @@ static u8 *AddTextPrinterForKazuPanel(const u8 *str, u32 x, u32 y, u32 bgColor, 
 
 void CreateBugSpacePanel(u32 battler)
 {
-    if (battler >= gBattlersCount)
+    if (!BugSpaceHasDoomClock() || battler >= gBattlersCount)
         return;
     u32 healthbox = gHealthboxSpriteIds[battler];
     if (healthbox >= MAX_SPRITES || !gSprites[healthbox].inUse
@@ -396,12 +397,16 @@ void TriggerBugSpacePanelTransformSlide(u32 battler)
         return;
 
     // Hold offscreen after sliding out; SlideIn callable will bring it back later.
+    if (!BugSpaceHasDoomClock())
+        gSprites[spriteId].tFlashing = FALSE;
     gSprites[spriteId].tSlideBack = TRUE;
     gSprites[spriteId].tState     = PANEL_SLIDING_OUT;
 }
 
 void TriggerBugSpacePanelSlideIn(u32 battler)
 {
+    if (!BugSpaceHasDoomClock())
+        return;
     u32 panelBattler = battler;
 
     // During transform scripts, gBattlerAttacker may not equal the battler that owns Bug Space.
@@ -441,6 +446,24 @@ void DestroyBugSpacePanel(u32 battler)
     sNumberSpriteId[battler] = MAX_SPRITES;
 }
 
+bool32 IsBugSpacePanelSliding(u32 battler)
+{
+    if (battler >= MAX_BATTLERS_COUNT)
+        return FALSE;
+    u32 spriteId = sBugSpacePanelSpriteId[battler];
+    return spriteId < MAX_SPRITES && gSprites[spriteId].inUse
+        && gSprites[spriteId].callback == SpriteCb_BugSpacePanel
+        && gSprites[spriteId].tBattler == battler
+        && gSprites[spriteId].tState != PANEL_IDLE;
+}
+
+void BS_WaitBugSpacePanelSlide(void)
+{
+    NATIVE_ARGS(u8 battler);
+    if (!IsBugSpacePanelSliding(GetBattlerForBattleScript(cmd->battler)))
+        gBattlescriptCurrInstr = cmd->nextInstr;
+}
+
 void ReshowKazuradropBattleUI(void)
 {
     // Menus reset sprites and VRAM, so discard the old panel IDs.
@@ -450,7 +473,7 @@ void ReshowKazuradropBattleUI(void)
         sNumberSpriteId[battler] = MAX_SPRITES;
     }
     ReshowServantSigils();
-    if (gBattleStruct != NULL && gBattleStruct->bugSpace.active)
+    if (BugSpaceHasDoomClock())
         CreateBugSpacePanel(gBattleStruct->bugSpace.sourceBattler);
 }
 

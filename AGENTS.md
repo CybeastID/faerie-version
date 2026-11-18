@@ -19,6 +19,8 @@ This project extends `pokeemerald-expansion` with custom battle mechanics.
 
 When proposing architectural changes, explicitly evaluate their upstream merge-maintenance impact.
 
+Entry scripts are authored for opposing Trainers and wild Pokémon. Player-side support is permitted by the underlying API but is not currently a supported encounter-authoring use case.
+
 ## 2. Build and Test Execution — Configurable Autonomy
 
 **Default mode: User-Controlled Testing.**

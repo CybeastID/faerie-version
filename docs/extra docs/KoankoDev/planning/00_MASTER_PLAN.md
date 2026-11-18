@@ -23,7 +23,7 @@ AI planning supplement: 2026-11-10. Stage11 adds encounter-wide tactical validat
 6. [Break Bar form transitions](06_break_bar_form_transitions.md) — **fully planned**; depends on 01–02.
 7. [Independent Zacian ally](07_independent_zacian_ally.md) — **fully planned**; depends on 01 and 06; integrates 04–05.
 8. [Dialga and Time Stop validation](08_dialga_time_stop_validation.md) — **fully planned**; depends on 01 and 07 cleanup.
-9. [Arceus Bug Space and Conversion 2](09_arceus_bug_space_and_conversion.md) — **fully planned**; depends on 01, 02 and 06; integrates after 07–08.
+9. [Arceus Bug Space and Conversion 2](09_arceus_bug_space_and_conversion.md) — **implemented; normal ROM and automated regressions passed; awaiting user visual acceptance** (2026-11-18). Complete staging/adaptation/production wiring, finite foreign-field fallback and twelve-faint traversal are covered (section 16). Work stops here; Stage 09.1 is held until the user verifies Stage 09. Depends on 01, 02 and 06; integrates after 07–08.
 10. [Integration and presentation](10_integration_and_presentation.md) — **fully planned**; final acceptance depends on 01–09 and the Stage11 AI gate; recommends cutting optional Aurora Beam.
 11. [Koanko AI behavior and tactical validation](11_koanko_ai_validation.md) — **fully planned**; reviews 01/03–09 and the 02 stat-refresh contract, then gates Stage10 final acceptance. Does not depend on completed Stage10.
 

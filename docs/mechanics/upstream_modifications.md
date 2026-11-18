@@ -1,5 +1,283 @@
 # Upstream modification ledger
 
+## Koanko Stage 09 entry and revised overcharge (2026-11-18)
+
+Completed adaptation integration: normal ROM build passed; all 23 Command Seal,
+172 Koanko, 30 Arceus and 5 real-animation staging groups passed on 2026-11-18.
+Earlier pending-implementation/validation notes below describe earlier snapshots;
+[Stage 09 section 16](../extra%20docs/KoankoDev/planning/09_arceus_bug_space_and_conversion.md#16-completed-implementation-and-validation-handoff-2026-11-18)
+records current coverage, remaining user visual acceptance and the Stage 09.1 hold.
+
+- `battle_move_resolution.c:TryMoveDamageUpdate` and
+  `battle_script_commands.c:Cmd_datahpupdate/Cmd_setatkhptozero`: narrow commit
+  notifications distinguish the actual zeroing attack type from untyped
+  scripted/self-KO damage. Custom ownership/layer checks live in
+  `battle_koanko_arceus.c`. Preserve ordering before bar queuing when merging;
+  test dynamic/called/multihit/instant-death sources and ordinary bars.
+- `battle.h:FutureSight`, `battle_move_resolution.c:SetFutureSightAttack` and
+  `battle_end_turn.c:HandleEndTurnFutureSight`: store resolved impact type before
+  yielding. The delayed attack setup also clears stale dynamic type when its
+  source is benched. This touches shared delayed-attack semantics and needs
+  Future Sight/Doom Desire regressions in addition to Arceus capture tests.
+  Added storage is battle-owned EWRAM. The normal link reports EWRAM 235,608 B
+  and IWRAM 28,808 B. Individual field padding/runtime heap high-water is unmeasured.
+- `battle_main.c:GetDynamicMoveType`: narrow owned-Judgment query precedes
+  item-driven type selection, including active-mon simulation. Verify no-Plate
+  and conflicting-Plate Judgment, reserve simulation and ordinary Arceus.
+  Future changes to AI move typing must retain runtime/query parity.
+- `battle_util.c:TryBattleFormChange`: owner-specific early guard preserves the
+  charged form across ordinary refresh methods, allowing faint/end cleanup.
+  Verify Multitype/item refresh and unrelated form changes. Method additions
+  upstream need semantic review rather than blindly retaining the guard.
+- `battle_util2.c:FreeBattleResources`: one cleanup call before freeing battle
+  state restores only the owned party species and removes the owned field/UI.
+  Verify genuine faint, interruption, foreign ownership and repeated cleanup.
+  Canonical battle-party species supports existing menu/graphics loading; no
+  general graphics loader or animation algorithm was modified for adaptation.
+
+The custom `battle_break_bar.c:TryBreakBar` continuation now includes the tagged
+adaptation in preflight and pushes it after saved-HP restoration. No original
+saved-layer phase scripts are enabled by this hook. Verify stack exhaustion,
+older saved/configured layers and exactly one adaptation. Production
+`battle_koanko.c:ConjureKoankoTeam` installs the staged entry only in the rebuilt
+Arceus party slot. Runtime fixtures in `koanko_arceus_adaptation.c` now exercise
+these paths; `koanko.c` verifies regeneration and twelve genuine faints.
+Most hooks are small textual changes, but shared delayed damage, form refresh
+and simulation introduce semantic maintenance risks requiring the regressions
+above. The packed encounter record is now 12 EWRAM bytes; no new IWRAM code or
+data is requested.
+
+The dedicated adaptation payload preflights five free task slots before using
+the existing form mosaic, preserving the generic task allocator/animation code.
+Its reveal native reloads actual graphics/palette after an animation is skipped
+or completes, guards missing sprites and leaves Substitute art intact. Scarce
+task, real-animation palette/shiny/rebuild and cleanup tests pass. The finite
+opening handoff now proceeds without stealing another active Bug Space field;
+the strict public dismissal API still rejects foreign owners.
+
+Adjacent results: Entry scripts 16, Trainer Slide 75, Break Bar 66, Future Sight
+19, Conversion 2 13, Transform 14, Polymorph 9 and Wish Endurance 10 all passed.
+Kazuradrop had 14 passes and its existing marked Stack Breaker task-leak failure.
+Standalone Doom Desire/Multitype prefixes selected no runnable tests; their
+Arceus-specific behavior is covered by the new runtime tests. Source and built
+ROM are stable for user visual review; no Stage 09.1 work was started.
+
+Graphics correction, automated-verified: both Arceus payloads now use the
+existing `handletrainerslidemsg ... RESTORE_BATTLER_SLIDE_CONTROL` after slide-out
+and controller completion. The trainer loader overwrites the battler's shared
+graphics buffer; omitting the restore lets later move animations draw trainer
+pixels as the mon. This changes only the dedicated scripts and adds compact
+EWRAM checksum observations to staging fixtures; no engine hook or runtime
+storage is added. `Koanko Arceus staged` now forces real move animations for its
+four core variants, including Seismic Toss after both slides; all five staging
+and 75 ordinary slide groups pass. User visual review remains pending. Existing
+dialogue/local fixture edits are kept.
+
+Fixture correction after the user reported two staging functions failing their
+first variants (two other functions passed): the initial checksum was sampled
+when protection armed, which precedes incoming graphic loading. It could record
+the outgoing mon. The reference now comes directly from Arceus ROM artwork,
+using a temporary 4 KiB EWRAM heap block freed at Turn 0; only checksum scalars
+remain. Separate capture/CRC assertions identify future mismatches; observer
+flags use equality assertions to report their actual values. Production
+scripts and restore commands are unchanged by this fixture correction. The later
+bar-break assertion now expects ADAPTED rather than COVERED; the rerun passes.
+
+**Implemented; complete automated/visual validation pending.** User compilation caught the
+shared item-popup helper call missing its optional owner-name argument. It now
+passes NULL, preserving ordinary nickname behavior. The subsequent emulator
+report exposed the missing slide restoration described above.
+The user now explicitly requires the dismissal
+text/panel slide, fair-trade text, Command Seal invocation, full HP heal then bar,
+and final-trial line. This supersedes the earlier no-opening-heal plan; older
+saved layers retain their HP. Details and limits:
+[opening/overcharge milestone](../extra%20docs/KoankoDev/planning/09_arceus_bug_space_and_conversion.md#15-revised-opening-and-overcharge-choreography-2026-11-18).
+
+- `battle_main.c:EndTurnEvents`: extends the existing Arceus completed-turn seam
+  with a returning event check after all end-turn handlers. The helper commits
+  its phase before yielding; return resumes the completed cursor before normal
+  cleanup/counters/selection. Narrow scheduling hook, no new callback lifecycle.
+- `battle_entry_scripts.c:TryRunBattleEventScript` and header: exposes the existing
+  custom returning-context runner for an owner-bound event. No second context
+  allocation/snapshot, entry count increment or extra opening callback.
+- `battle_interface.c:CreateAbilityPopUp`, `CreateAbilityPopUpWithName`,
+  `FormatAbilityPopUpOwner`, `PrintBattlerOnAbilityPopUp`: shared rendering with
+  an explicit presentation owner label. The ordinary wrapper retains global
+  overwrite/nickname/Illusion behavior. The new API bypasses the global override
+  without changing it, allowing Alter Ego's Bug Space with genuine Multitype.
+  `battle_interface.h` adds its public declaration. No persistent popup state.
+- `kazuradrop_battle_ui.c:IsBugSpacePanelSliding`, `BS_WaitBugSpacePanelSlide`
+  and header expose a read-only panel completion gate. Existing create/slide/UI
+  ownership and cleanup are unchanged.
+- `data/battle_scripts_1.s` adds one include for dedicated returning Arceus
+  payloads/text. `battle_scripts.h` exports their entry points. The scripts use
+  existing heal, controller synchronization, saved-layer animation and trainer
+  slide operations. No shared HP algorithm or Break Bar resolver changes.
+- `test_runner.h`, `test/battle.h`, `test_runner_battle.c`: optional exact popup
+  owner-label matching and recorder argument. Existing fixtures omit the field
+  and retain prior matching; the same formatter supplies graphics and headless
+  events. This metadata is test-only.
+
+`battle_koanko_arceus.c` owns scheduling eligibility, natives and the opt-in
+entry config. OVERCHARGING is a new enum phase within the same packed five-byte
+EWRAM record; configuration/text remains ROM and no IWRAM placement is added.
+Policy remains outside upstream functions. Rebase review must preserve the
+completed-turn yield/cursor, runner stack capacity/context, ordinary popup
+overwrite behavior and heal-before-cover controller order. These are semantic
+risks even though the scheduler/include edits are narrow. Production remains
+unconfigured until charged adaptation/form/Judgment integration is complete.
+Regressions: `Koanko Arceus`, `Entry scripts:`, `Kazuradrop`, `Break Bar`.
+
+## Koanko Stage 09 Bug Space modes (2026-11-18)
+
+**User-verified after four fixture setup/DSL corrections.** The user reports
+`Koanko Arceus Bug Space` and `Kazuradrop Bug Space` reruns passing; counts were
+not supplied. Explicit reserve Speed and grouped `NONE_OF` corrections affect only
+`koanko_arceus_bug_space.c`; no engine integration changed for these fixes.
+Implementation, lifecycle, limits and validation:
+[Bug Space mode milestone](../extra%20docs/KoankoDev/planning/09_arceus_bug_space_and_conversion.md#13-bug-space-modes-and-persistent-clock-dismissal-2026-11-18).
+Production entry remains unconfigured while the remaining sequence is incomplete.
+
+- `include/battle.h:BugSpaceData.mode`: repurposes the unused byte
+  `thresholdPercent`; no added state bytes, allocator change, save format change
+  or new IWRAM declaration. Zero remains ordinary Kazuradrop mode.
+- `battle_end_turn.c:HandleEndTurnBugSpaceDecay`: extracts existing positive-stage
+  crushing to custom `battle_bug_space.c:BugSpaceCrushBoosts`, keeping its original
+  scheduler position/cursor and Kazuradrop decay/tier/message order. Crush-only
+  bypasses decay/tier changes while continuing crushing. Tier announcements and
+  `HandleEndTurnBugSpacePassiveOHKO` remain Kazuradrop-specific.
+- `battle_faerie_move_resolution.inc:IsMoveBlockedByBugSpace`, `CancelerBugSpace`,
+  `TrashCrushInstantKnockout`: mode guards and plain Koanko blocked presentation.
+  Preserve the intentional Explosion self-KO before the blocker, followed by
+  Kazuradrop's Invincible icon and taunt; the canceler order is unchanged.
+  `battle_util.c:GetMinimizeModifier`, `GetAdjustedDamage`,
+  `CanMoveSkipAccuracyCalc`; `battle_move_resolution.c:CancelerDamageCalc`;
+  `battle_script_commands.c:BS_TrashCrushOHKOCheck`; and
+  `battle_end_turn.c:HandleEndTurnMeltVirus`: narrow guards exclude dismissed
+  clock tier effects. Real Minimize/ordinary move effects retain prior branches.
+- `battle_util.c:AbilityBattleEffects`: legendary punishment requires Kazuradrop
+  mode. `battle_script_commands.c:Cmd_tryfaintmon` and
+  `battle_anim.c:LaunchBattleAnimation`: Kazura passive-faint/throw-out presentation
+  requires Kazuradrop mode, preventing its custom loss flow on Koanko's field.
+- `kazuradrop_battle_ui.c:CreateBugSpacePanel`, `TriggerBugSpacePanelSlideIn`,
+  `ReshowKazuradropBattleUI`: mode gates keep dismissed UI hidden across refreshes.
+  `TriggerBugSpacePanelTransformSlide` stops a dismissed panel's pending flash.
+- `data/battle_scripts_1.s:BattleScript_KoankoArceusStatDecay` aliases the existing
+  animation/message after Kazuradrop's popup; the original entry/popup ordering
+  stays intact. `BattleScript_KoankoArceusMoveBlocked` is a plain move-end script.
+  New declarations are in `battle_scripts.h`.
+
+The custom owner module initializes/dismisses its field and cleans up through
+existing owner notifications; no new entry/end-turn/exit scheduler hook. Shared
+policy lives in a dedicated module, reducing repeated custom logic in upstream
+functions. The extracted crushing block is the only moved engine behavior;
+other changes are mode guards. Semantic rebase review must check all tier
+consumers, script call order, scheduler cursors and panel recreation, even where
+textual overlap is small. Existing Kazura mode-zero initialization must remain.
+Regression prefixes: `Koanko Arceus`, `Kazuradrop`, `Minimize`, `Break Bar`,
+`Koanko Command Seal`. Manual menus/presentation and full encounter remain pending.
+
+## Koanko Stage 09 opening protection (2026-11-18)
+
+Implementation and validation contract:
+[opening-protection foundation](../extra%20docs/KoankoDev/planning/09_arceus_bug_space_and_conversion.md#12-opening-protection-foundation-2026-11-18).
+**User-verified**, excluding out-of-scope Max/Tera Raid TODOs in the requested
+regression suites. User compilation initially caught the five-byte state
+assertion failing due to APCS-GNU struct padding; explicit packing of the byte-only
+record corrected the source layout, and the subsequent user run passed. Production party
+data does not install the opt-in
+entry marker while the remaining final boss sequence is incomplete.
+
+- `include/battle.h:BattleStruct.koankoArceus`: packed five-byte record in the existing
+  EWRAM heap allocation; alignment affects actual struct growth. No allocator
+  change, IWRAM static or map flag/var claim. `battle_koanko.h` owns the compact
+  identity/phase schema and interfaces; runtime policy stays in the dedicated
+  `battle_koanko_arceus.c` module.
+- `SwitchInClearSetData`'s existing `KoankoOnSwitchIn` integration now dispatches
+  owner/entry-marker arming before hazards. No new core switch-in hook. The
+  custom dispatch also retires a stale owner when its position is repopulated.
+- `battle_main.c:HandleTurnActionSelectionState`, `EndTurnEvents`: narrow
+  selection/completed-turn notifications. They distinguish arrival remainder
+  from the first complete turn and retain the floor until saved-layer handoff.
+  `FaintClearSetData` notifies genuine owner retirement; normal battle allocation
+  cleanup owns the rest, with no new exit/graphics-cleanup hook.
+- `battle_move_resolution.c:CancelerMoveAnimation`, `CancelerHealthBarUpdate`,
+  `TryMoveDamageUpdate`: owner-scoped reachable-loss animation hint and matched
+  preview/commit clamps. Substitute/Disguise/Ice Face retain their prior order.
+  `MoveEndFaintBlock` repairs protected raw zero before bar/faint/reward gates.
+- `battle_script_commands.c:Cmd_healthbarupdate`, `Cmd_datahpupdate`: matched
+  passive/scripted/instant-death loss clamp. Protected instant death becomes
+  bounded damage and cannot trigger healing-mirror benefits. Unconfigured
+  actors retain baseline handling.
+- `Cmd_tryexplosion`, `Cmd_setatkhptozero`, `BS_InstantHpDrop` and
+  `battle_move_resolution.c:StatChangeBeforeChange` (Memento) route self-KO
+  presentation/commit through the same owner policy. `Cmd_tryfaintmon` provides
+  the scripted raw-zero last defense before any bar or genuine faint.
+
+All are narrow hooks, not replacement core algorithms. Keeping policy in the
+custom module limits textual merge overlap; semantic review must still cover
+every changed preview/commit and script/controller yield when rebasing upstream.
+No Break Bar resolver or ordinary Time Stop/recharge behavior changed. The
+handoff helper refuses to reuse an older saved layer and leaves its covered HP
+identity intact. Regression prefixes: `Koanko Arceus protection`, `Koanko Command
+Seal`, `Break Bar`, `Final Gambit`, `Destiny Bond`, `Perish Song`, `Koanko Dialga`.
+
+## Koanko Stage 09 form-selection core (2026-11-18)
+
+- `include/random.h:RNG_KOANKO_ARCEUS_FORM`: appended tag for a uniform finite
+  choice among resisting actual Arceus forms. Existing tag values are unchanged.
+  This is an enum extension, with no change to RNG algorithms or engine dispatch.
+- `src/battle_koanko_arceus.c:KoankoChooseArceusResistantForm` and its declaration
+  in `battle_koanko.h` are dedicated custom code, reusing the existing
+  `GetTypeModifier` chart/inverse interface. No existing engine function changed.
+  No encounter is wired to this selector yet; lifecycle/type capture/form changes
+  remain future integration work.
+
+No new mutable static storage, heap allocation, BattleStruct state or IWRAM
+placement. The form map is const in ROM and selection uses scalar locals.
+Merge impact is confined to appending the RNG tag and custom module/header;
+semantic compatibility depends on retaining the real 18 form records and current
+type-chart behavior. No independent matchup chart or ordinary Conversion 2 edit.
+Regression coverage: `make check TESTS='Koanko Command Seal'` (selector only),
+user compilation found a test-macro error, now corrected in both parameterized
+function fixtures by using function-runner `PARAMETRIZE_LABEL`.
+Selector/engine integration and RAM placement were unchanged by that correction.
+The user then reported the initial selector green. The subsequent user-requested
+ranking revision was subsequently reported green as well: minimize incoming damage
+multiplier, maximize Judgment's multiplier against current effective foe types,
+then uniformly choose among equals. Candidate forms remain the existing 18,
+excluding Divine/Alter Ego/Caster/Stellar. There is no new engine integration or
+mutable scratch/RAM state, and ordinary Conversion 2 is unchanged. Source and
+fixture changes are confined to the custom module/header/test. Details and remaining scope:
+[Stage 09 milestone](../extra%20docs/KoankoDev/planning/09_arceus_bug_space_and_conversion.md#10-form-selection-core-milestone-2026-11-18).
+
+## Koanko Stage 08 validation fixtures (2026-11-18)
+
+The first Stage 08 milestone adds tests only; **no new or changed upstream engine
+integration point** and no new production RAM state. Existing Time Stop/recharge
+dispatch, faint replacement and Break Bar behavior remain unchanged. New fixture
+bytecode/configuration is const in ROM, with no mutable static observation buffers.
+
+Coverage and user-run commands:
+[Stage 08 implementation record](../extra%20docs/KoankoDev/planning/08_dialga_time_stop_validation.md#9-first-validation-milestone-2026-11-18).
+The new `Koanko Dialga` fixtures use the existing returning Turn 0 contract to
+seed the already-conjured singles boundary; they do not add production encounter
+configuration. Codex has not executed builds/tests. Palette polish and visual
+cleanup verification remain open.
+
+First user-run follow-up: five fixture failures were reported. Corrected recorded
+playback outcome/final no-command-turn expectations and the saved-layer Time Stop
+proc case; modernized the older regeneration/twelve-faint fixtures for production
+form bars and Zacian. These are test-only corrections with no new engine
+integration point or RAM state. The user subsequently reported all three requested
+reruns green (Dialga fixtures, regeneration, twelve-faint traversal); no counts
+were supplied. See Stage 08 section 10. Palette/manual acceptance remains open.
+
+Stage 09 should reuse On Entry/configured covering-layer interfaces before adding
+new hooks. Its remaining cross-source survival/type-capture requirements still
+need semantic compatibility tests. The user's memory restraint is explicit:
+prefer battle-owned EWRAM/ROM and avoid new IWRAM data/code or large stack snapshots.
+
 ## Configurable Turn 0 / On Entry scripts (2026-11-17)
 
 Implementation, ordering, TX audit and authoring/validation details:
@@ -14,6 +292,11 @@ now asserts the existing Castoria-level revival block; the user reports the
 focused rerun passed, completing the requested automated regression batch.
 No new or changed engine hook accompanies that test correction. mGBA acceptance
 remains pending.
+
+Standing authoring scope: entry scripts are for opposing Trainers and wild
+Pokémon. The underlying API permits player-side support, which is not currently
+a supported encounter-authoring use case. This is authoring guidance, with no
+additional engine gate or integration point.
 
 - `battle_setup.c:CreateNPCTrainerParty` uses the dedicated scoped script adapter
   around the existing Break Bar adapter. `CreateNPCTrainerPartyFromTrainer`

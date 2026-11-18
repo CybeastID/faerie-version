@@ -1225,6 +1225,7 @@ static void Cmd_healthbarupdate(void)
     s32 requested = gBattleStruct->passiveHpUpdate[battler];
     s32 damage = (gBattleStruct->instantDeathHpUpdate & (1u << battler))
         ? requested : ClampBreakBarPassiveDamage(battler, requested);
+    damage = KoankoArceusClampHpLoss(battler, damage);
     if (!IsBreakBarPending(battler) && (damage != 0 || requested == 0))
     {
         BtlController_EmitHealthBarUpdate(battler, B_COMM_TO_CONTROLLER, min(damage, 10000));
@@ -1246,6 +1247,12 @@ static void Cmd_datahpupdate(void)
     bool32 instantDeath = (gBattleStruct->instantDeathHpUpdate & (1u << battler)) != 0;
     s32 requested = gBattleStruct->passiveHpUpdate[battler];
     s32 change = instantDeath ? requested : ClampBreakBarPassiveDamage(battler, requested);
+    change = KoankoArceusClampHpLoss(battler, change);
+    if (instantDeath && KoankoArceusIsProtected(battler))
+    {
+        instantDeath = FALSE;
+        healing = FALSE;
+    }
     gBattleStruct->healingHpUpdate &= ~(1u << battler);
     gBattleStruct->instantDeathHpUpdate &= ~(1u << battler);
     if (IsBreakBarPending(battler) || (!instantDeath && requested != 0 && change == 0))
@@ -1278,6 +1285,7 @@ static void Cmd_datahpupdate(void)
             gProtectStructs[battler].assuranceDoubled = TRUE; // Will reset for the next turn
     }
 
+    KoankoArceusOnHpUpdate(battler, oldHp, MAX_BATTLERS_COUNT, TYPE_NONE);
     QueueBreakBar(battler);
     gBattleStruct->passiveHpUpdate[battler] = 0;
 
@@ -1915,6 +1923,8 @@ static void Cmd_tryfaintmon(void)
     enum BattlerId battler;
 
     battler = GetBattlerForBattleScript(cmd->battler);
+    if (KoankoArceusRepairFaint(battler))
+        return; // Retry this command after the controller finishes the HP snap.
     if (cmd->isSpikes)
     {
         if (gHitMarker & HITMARKER_FAINTED(battler))
@@ -1952,7 +1962,7 @@ static void Cmd_tryfaintmon(void)
 
             SetValuesOnFaint(battler);
             BattleScriptPush(cmd->nextInstr);
-            gBattlescriptCurrInstr = gBattleStruct->bugSpace.active
+            gBattlescriptCurrInstr = BugSpaceIsKazuradrop()
                 && gBattleStruct->bugSpace.currentTier == BUGSPACE_TIER_PASSIVE_OHKO
                 ? BattleScript_BugSpacePassiveFaintBattler : BattleScript_FaintBattler;
         }
@@ -5329,8 +5339,7 @@ static void Cmd_tryexplosion(void)
         return;
 
     gBattleStruct->passiveHpUpdate[gBattlerAttacker] = gBattleMons[gBattlerAttacker].hp;
-    BtlController_EmitHealthBarUpdate(gBattlerAttacker, B_COMM_TO_CONTROLLER, INSTANT_HP_BAR_DROP);
-    MarkBattlerForControllerExec(gBattlerAttacker);
+    KoankoArceusEmitHpDrop(gBattlerAttacker);
     gBattlescriptCurrInstr = cmd->nextInstr;
 }
 
@@ -5341,7 +5350,9 @@ static void Cmd_setatkhptozero(void)
     if (gBattleControllerExecFlags)
         return;
 
-    gBattleMons[gBattlerAttacker].hp = 0;
+    u32 oldHp = gBattleMons[gBattlerAttacker].hp;
+    gBattleMons[gBattlerAttacker].hp = KoankoArceusIsProtected(gBattlerAttacker) ? 1 : 0;
+    KoankoArceusOnHpUpdate(gBattlerAttacker, oldHp, MAX_BATTLERS_COUNT, TYPE_NONE);
     QueueBreakBar(gBattlerAttacker);
     BtlController_EmitSetMonData(gBattlerAttacker, B_COMM_TO_CONTROLLER, REQUEST_HP_BATTLE, 0, sizeof(gBattleMons[gBattlerAttacker].hp), &gBattleMons[gBattlerAttacker].hp);
     MarkBattlerForControllerExec(gBattlerAttacker);
@@ -11134,8 +11145,7 @@ void BS_AbilityOnFormChange(void)
 void BS_InstantHpDrop(void)
 {
     NATIVE_ARGS();
-    BtlController_EmitHealthBarUpdate(gBattlerAttacker, B_COMM_TO_CONTROLLER, INSTANT_HP_BAR_DROP);
-    MarkBattlerForControllerExec(gBattlerAttacker);
+    KoankoArceusEmitHpDrop(gBattlerAttacker);
     gBattlescriptCurrInstr = cmd->nextInstr;
 }
 
@@ -12961,7 +12971,7 @@ void BS_TrashCrushOHKOCheck(void)
     NATIVE_ARGS(const u8 *failInstr);
     u32 ohkoChance = 20;
     
-    if (gBattleStruct->bugSpace.active
+    if (BugSpaceHasDoomClock()
      && gBattleStruct->bugSpace.currentTier >= BUGSPACE_TIER_OHKO
      && GetBattlerSide(gBattlerTarget) != GetBattlerSide(gBattleStruct->bugSpace.sourceBattler))
     {
@@ -12971,7 +12981,7 @@ void BS_TrashCrushOHKOCheck(void)
     }
     
     if (gBattleMons[gBattlerTarget].volatiles.minimize
-     || (gBattleStruct->bugSpace.active
+     || (BugSpaceHasDoomClock()
       && gBattleStruct->bugSpace.currentTier >= BUGSPACE_TIER_MINIMIZE
       && GetBattlerSide(gBattlerTarget) != GetBattlerSide(gBattleStruct->bugSpace.sourceBattler)))
         ohkoChance = 40;

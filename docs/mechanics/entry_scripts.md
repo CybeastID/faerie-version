@@ -31,6 +31,11 @@ trainer generation handoff live in `src/battle_entry_scripts.c`. Author static
 trainer defaults in the sparse `src/data/trainer_battle_scripts.h` table. Do not
 edit generated trainer data or saved Pokemon structures.
 
+Entry scripts are authored for opposing Trainers and wild Pokémon. Player-side
+support is permitted by the underlying API but is not currently a supported
+encounter-authoring use case. The owner model and tests may exercise player-side
+capabilities without making them supported encounter-authoring patterns.
+
 An On Entry configuration contains a returning battle-script pointer and either
 `ENTRY_SCRIPT_ONCE_PER_BATTLE` (the default, zero) or
 `ENTRY_SCRIPT_EVERY_ENTRY`. The pointer and saturating execution count belong to
@@ -373,7 +378,8 @@ copy, build using the project's usual ROM command, then in mGBA:
    normal slides precede the new introduction; rain starts before the first menu.
 2. Play the first turn: each chosen participant acts once and spends only its
    chosen move's PP. Return from party/Bag/summary; no introduction repeats.
-3. Withdraw and reenter the configured mon twice. Confirm first/repeat messages
+3. Have the configured opposing mon leave and reenter twice, for example through
+   the trainer's switching logic. Confirm first/repeat messages
    for EVERY_ENTRY, and a single message total for ONCE_PER_BATTLE.
 4. Start the wild encounter: text, animation and weather complete; normal wild
    capture/run behavior remains available. Finish/abort and start an unconfigured
@@ -383,3 +389,24 @@ copy, build using the project's usual ROM command, then in mGBA:
    original ambush and formation timing and complete normal cleanup.
 
 Do not copy the examples into production merely to enable the engine interface.
+
+## Returning battle events (Stage 09, awaiting validation)
+
+`TryRunBattleEventScript(battler, script)` exposes the same single-owner returning
+runner for an already scheduled battle event. It checks controller/owner/stack
+eligibility through the existing runner, saves context in the same EWRAM buffer,
+and uses the ordinary returning wrapper. It does not increment a mon's entry
+counter or install an opening callback. The caller must choose a safe interpreter
+boundary and commit its event latch before yielding; nesting while another
+configured payload owns the context is rejected. Encounter authoring remains
+opposing trainer/wild participants.
+
+Koanko's Arceus staged config uses it after the first completed full
+turn, before next selection. The same interpreter resumes ENDTURN_COUNT after
+the payload and performs ordinary cleanup once. This adds no context buffer or
+IWRAM static. `ConjureKoankoTeam` now installs the config on the regenerated
+Arceus. Autonomous validation on 2026-11-18 passed all 172 `Koanko` groups,
+including production regeneration and twelve genuine faints, all 16 existing
+runner groups and the five staging groups with real move animations enabled
+for the core choreography. User visual acceptance remains separate. Rerun with:
+`make check TESTS='Koanko Arceus'` and `make check TESTS='Entry scripts:'`.
