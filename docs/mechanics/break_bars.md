@@ -102,6 +102,42 @@ layer, it uses that layer's Break Bar color.
 Only the covered layer's presentation changes while the new purple bar fills;
 the animation and final Break Bar palette are unchanged.
 
+## Configured bars: inactive start and rearming
+
+A config's phase table does not depend on how many of its bars are active. The owner's
+`breakBarConfig` pointer and `config->phases[]` are never written during a battle; breaking a bar only
+lowers `breakBarsRemaining`. Two additions use that:
+
+- `BREAK_BAR_START_INACTIVE` in `BreakBarConfig.flags` registers the config with **zero** active bars
+  (`ActivateBreakBar`, wild and trainer initialisation all use `GetInitialBreakBarCount`). The owner keeps
+  looking like an ordinary HP bar until one of its bars has been active, then like any exhausted stack.
+- `GrantConfiguredBreakBar(battler, flags)` / the `grantconfiguredbreakbar` and `grantconfiguredcoverbreakbar`
+  script macros raise the active count by one, using the owner's own `phases[activeCount]`. It also restores a
+  consumed bar: the next break runs the same phase scripts again, any number of times. It fails when there is no
+  config, no unused phase (the position is already taken, including by an ordinary saved layer, or the config's
+  `extraBars` is reached), the battler is dead or has a pending break. The five-bar cap follows from
+  `extraBars <= 5`.
+
+Without `BREAK_BAR_GRANT_COVER` the current HP bar simply becomes the layer, exactly as `ActivateBreakBar`
+registers one (no HP is saved). With it the current HP/max HP pair is saved in the layer (like
+`GrantSavedBreakBar`; run `fillsavedbreakbar`/`animatesavedbreakbar` afterwards) and a per-layer bit in
+`breakBarCoverScripts` records that this saved layer belongs to its configured phase. Breaking such a layer
+runs **restore covered HP/max HP -> `onBreakScript` -> `afterBreakScript` -> return**. A NULL `onBreakScript` on a
+covering layer means "nothing", never the shared refill: a refill after the restore would heal the covered HP. A
+script that wants a heal can say so explicitly (for example `BattleScript_BreakBarRefill`).
+
+To heal the covered layer as a visible beat, heal first and then cover: the pair a covering grant saves is whatever
+HP the owner has at that moment, so a heal before the grant means the exact restore later returns the healed
+HP. `BattleScript_ConfiguredBarHealThenCover` is that sequence ready-made (expects `gBattlerTarget` to be the
+owner): it checks `canconfiguredbreakbar` first, plays the Lunar Dance heal animation, refills with the HP bar
+update, then runs `grantconfiguredcoverbreakbar`, `fillsavedbreakbar` and `animatesavedbreakbar`. A caller that
+does not want the heal uses the grant/fill/animate part alone. The covering layer need never break for the heal
+to stand, unlike a heal deferred to the break.
+
+Ordinary `GrantSavedBreakBar` layers (Break Charm, Lunar Dance, Wish for Endurance) still never run phase
+scripts, even where `phases[n]` exists at their position; the bit is cleared on that grant and trimmed whenever a
+layer is consumed or the stack is exhausted.
+
 ## Scripted wild encounters and capture
 
 `setwildbreakbars config` selects a static `BreakBarConfig` for the first wild

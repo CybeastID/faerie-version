@@ -2,6 +2,7 @@
 #include "config/battle.h"
 #include "constants/global.h"
 #include "constants/battle.h"
+#include "constants/battle_break_bar.h"
 #include "constants/pokemon.h"
 #include "constants/battle_arena.h"
 #include "constants/battle_move_resolution.h"
@@ -6596,11 +6597,59 @@ BattleScript_KoankoZacianDepart::
     callnative BS_TempAllyDepart
     end
 
+BattleScript_BreakBarIntro::
+    callnative BS_AnimateBreakBarIntro
+    return
+
+#if TESTING
+BattleScript_TestConfiguredPlainGrant::
+    getconfiguredbreakbarresult BS_TARGET
+    jumpifbyte CMP_NOT_EQUAL, cMULTISTRING_CHOOSER, BREAK_BAR_GRANT_READY, BattleScript_TestConfiguredGrantEnd
+    grantconfiguredbreakbar BS_TARGET, BattleScript_TestConfiguredGrantEnd
+    showbreakbarfills BS_TARGET
+    callnative Test_RecordConfiguredGrantPresentation
+    return
+
+BattleScript_TestConfiguredCoverGrant::
+    grantconfiguredcoverbreakbar BS_TARGET, BattleScript_TestConfiguredGrantEnd
+    callnative Test_RecordConfiguredGrantPresentation
+BattleScript_TestConfiguredGrantEnd:
+    return
+
+BattleScript_TestConfiguredHealGrant::
+    callnative Test_PrepareConfiguredHealGrant
+    jumpifbyte CMP_EQUAL, cMULTISTRING_CHOOSER, FALSE, BattleScript_TestConfiguredGrantEnd
+    healthbarupdate BS_TARGET
+    datahpupdate BS_TARGET, ASSURANCE_DOUBLE
+    waitstate
+    pause B_WAIT_TIME_LONG
+    call BattleScript_ConfiguredBarHealThenCover
+    callnative Test_RecordConfiguredHealGrant
+    return
+
+#endif
+
 BattleScript_BreakBarRefill::
     callnative BS_RefillBreakBar
     healthbarupdate BS_TARGET
     datahpupdate BS_TARGET, ASSURANCE_DOUBLE
     return
+
+@ Reusable beat for a configured covering layer that should come with a heal: heal the owner (gBattlerTarget)
+@ to full with the Lunar Dance heal animation, THEN cover that full HP with the owner's next configured layer and
+@ fill it. The heal is skipped entirely if the layer cannot be granted. Callers print their own message before
+@ or after (the covered pair is saved after the heal, so it later restores exactly, at full HP).
+BattleScript_ConfiguredBarHealThenCover::
+	canconfiguredbreakbar BS_TARGET, BattleScript_ConfiguredBarHealThenCoverEnd
+	playanimation BS_TARGET, B_ANIM_WISH_HEAL
+	waitanimation
+	callnative BS_RefillBreakBar
+	healthbarupdate BS_TARGET
+	datahpupdate BS_TARGET, ASSURANCE_DOUBLE
+	waitstate
+	grantconfiguredcoverbreakbar BS_TARGET, BattleScript_ConfiguredBarHealThenCoverEnd
+BattleScript_ConfiguredBarHealThenCoverEnd:
+	return
 
 BattleScript_BreakBarReturn::
     restoretarget

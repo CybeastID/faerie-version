@@ -618,6 +618,8 @@ struct PartyState
     u32 breakBarPending:1;
     u32 breakBarItemUsed:1;
     u32 breakBarsPeak:3;
+    u32 breakBarCoverScripts:5; // Bit n: saved layer n was granted from config->phases[n] and runs its scripts.
+    u32 breakBarIntroShown:1;
     const struct BreakBarConfig *breakBarConfig;
     u16 breakBarSavedHp[BREAK_BAR_MAX_EXTRA_BARS];
     u16 breakBarSavedMaxHp[BREAK_BAR_MAX_EXTRA_BARS];

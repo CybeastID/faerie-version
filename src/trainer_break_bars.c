@@ -43,7 +43,7 @@ void TrainerBreakBarsRecordGeneratedMon(struct Pokemon *party, u32 partySlot, u3
     {
         struct PartyState *state = &gBattleStruct->partyState[trainer][partySlot];
         state->breakBarConfig = config;
-        state->breakBarsRemaining = config->extraBars;
+        state->breakBarsRemaining = GetInitialBreakBarCount(config);
     }
     else
         sPendingConfigs[trainer][partySlot] = config;
@@ -66,7 +66,7 @@ void TrainerBreakBarsApplyPending(void)
                 {
                     struct PartyState *state = &gBattleStruct->partyState[trainer][slot];
                     state->breakBarConfig = config;
-                    state->breakBarsRemaining = config->extraBars;
+                    state->breakBarsRemaining = GetInitialBreakBarCount(config);
                 }
             }
     TrainerBreakBarsClearPending();
@@ -139,7 +139,7 @@ void InitializeTrainerBreakBar(u32 partySlot, const struct TrainerBreakBarRules 
     // touching graphics; the first healthbox draw reads this party-owned state.
     struct PartyState *state = &gBattleStruct->partyState[B_SIDE_OPPONENT][partySlot];
     state->breakBarConfig = config;
-    state->breakBarsRemaining = config->extraBars;
+    state->breakBarsRemaining = GetInitialBreakBarCount(config);
 }
 
 void BS_ActivateBreakBar(void)

@@ -2349,6 +2349,8 @@ static void MoveBattleBarGraphically(enum BattlerId battler, u8 whichBar)
         }
 
         RefreshBreakBarPalette(battler, FALSE);
+        if (DrawBreakBarIntroBase(battler))
+            break;
         if (GetBreakBarCount(battler) != 0)
             barElementId = HEALTHBOX_GFX_HP_BAR_GREEN;
         else if (IsBreakBarBase(battler))

@@ -602,6 +602,10 @@ static void CB2_InitBattleInternal(void)
             CastoriaTryCreateDebugParty(gParties[B_TRAINER_OPPONENT_A], TRAINER_BATTLE_PARAM.opponentA, TRUE);
         }
     TrainerBreakBarsApplyPending();
+#if TESTING
+    if (gTestRunnerEnabled)
+        TestRunner_Battle_InitializeBreakBars();
+#endif
     Script_ClearTrainerBreakBarOverrides();
     Script_ClearWildBreakBarOverride();
     gMain.inBattle = TRUE;

@@ -1,5 +1,6 @@
 #include "global.h"
 #include "battle.h"
+#include "battle_break_bar.h"
 #include "battle_hold_effects.h"
 #include "battle_stat_change.h"
 #include "battle_util.h"
@@ -31,6 +32,8 @@ bool32 DoSwitchInEvents(void)
     switch (gBattleStruct->eventState.switchIn)
     {
     case SWITCH_IN_EVENTS_ORDER_BY_SPEED:
+        if (TryShowBreakBarIntro())
+            return TRUE;
         for (enum BattlerId i = 0; i < gBattlersCount; i++)
             gBattlersBySpeed[i] = i;
         SortBattlersBySpeed(gBattlersBySpeed, FALSE);

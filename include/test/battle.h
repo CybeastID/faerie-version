@@ -795,6 +795,11 @@ struct BattleTestData
     u8 nature;
     bool8 isShiny;
     enum Ability forcedAbilities[MAX_BATTLE_TRAINERS][PARTY_SIZE];
+    const struct BreakBarConfig *breakBarConfigs[MAX_BATTLE_TRAINERS][PARTY_SIZE];
+    u8 breakBarFirstVisibleMask;
+    u8 breakBarFirstVisiblePalette[MAX_BATTLERS_COUNT];
+    u16 breakBarFirstVisibleColors[MAX_BATTLERS_COUNT][2];
+    u8 breakBarFirstVisibleTiles[MAX_BATTLERS_COUNT][6 * TILE_SIZE_4BPP];
     u8 chosenGimmick[MAX_BATTLE_TRAINERS][PARTY_SIZE];
     u8 forcedEnvironment;
 
@@ -1045,6 +1050,7 @@ void DeclareSummonedAlly(u32 sourceLine);
 #define Ability(ability) Ability_(__LINE__, ability)
 #define Level(level) Level_(__LINE__, level)
 #define MaxHP(maxHP) MaxHP_(__LINE__, maxHP)
+#define BreakBars(config) BreakBars_(__LINE__, config)
 #define HP(hp) HP_(__LINE__, hp)
 #define Attack(attack) Attack_(__LINE__, attack)
 #define Defense(defense) Defense_(__LINE__, defense)
@@ -1089,6 +1095,7 @@ void Nature_(u32 sourceLine, u32 nature);
 void Ability_(u32 sourceLine, enum Ability ability);
 void Level_(u32 sourceLine, u32 level);
 void MaxHP_(u32 sourceLine, u32 maxHP);
+void BreakBars_(u32 sourceLine, const struct BreakBarConfig *config);
 void HP_(u32 sourceLine, u32 hp);
 void Attack_(u32 sourceLine, u32 attack);
 void Defense_(u32 sourceLine, u32 defense);

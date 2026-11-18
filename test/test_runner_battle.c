@@ -12,6 +12,9 @@
 #include "fieldmap.h"
 #include "item_menu.h"
 #include "main.h"
+#include "palette.h"
+#include "sprite.h"
+#include "task.h"
 #include "malloc.h"
 #include "party_menu.h"
 #include "random.h"
@@ -2631,6 +2634,14 @@ void MaxHP_(u32 sourceLine, u32 maxHP)
     SetMonData(DATA.currentMon, MON_DATA_HYPER_TRAINED_HP, &hyperTrainingFlag);
 }
 
+void BreakBars_(u32 sourceLine, const struct BreakBarConfig *config)
+{
+    INVALID_IF(!DATA.currentMon, "BreakBars outside of PLAYER/OPPONENT");
+    INVALID_IF(config == NULL || config->extraBars == 0 || config->extraBars > BREAK_BAR_MAX_EXTRA_BARS,
+        "BreakBars requires a static config with one through five extras");
+    DATA.breakBarConfigs[DATA.battlerParty][DATA.currentPartyIndex] = config;
+}
+
 void HP_(u32 sourceLine, u32 hp)
 {
     INVALID_IF(!DATA.currentMon, "HP outside of PLAYER/OPPONENT");
@@ -3967,6 +3978,62 @@ void ValidateFinally(u32 sourceLine)
 {
     // Defer this error until after estimating the cost.
     INVALID_IF(STATE->parametersCount == 0, "FINALLY without PARAMETRIZE");
+}
+
+static void Task_RecordFirstVisibleBreakBar(u8 taskId)
+{
+    if (!gTasks[taskId].data[1])
+    {
+        // Controllers assign positions and party indexes after CB2_InitBattle.
+        if (gBattlerPositions[0] == B_POSITION_ABSENT)
+            return;
+        for (u32 battler = 0; battler < gBattlersCount; battler++)
+            if (GetBattlerPartyState(battler)->breakBarsRemaining != 0)
+                gTasks[taskId].data[0] |= 1u << battler;
+        gTasks[taskId].data[1] = TRUE;
+    }
+    for (u32 battler = 0; battler < gBattlersCount; battler++)
+    {
+        if (!(gTasks[taskId].data[0] & (1u << battler)))
+            continue;
+        u32 healthbox = gHealthboxSpriteIds[battler];
+        if (healthbox >= MAX_SPRITES || !gSprites[healthbox].inUse || gSprites[healthbox].invisible)
+            continue;
+        u32 bar = gSprites[healthbox].data[5];
+        if (bar >= MAX_SPRITES || !gSprites[bar].inUse || gSprites[bar].invisible)
+            continue;
+        u32 palette = gSprites[bar].oam.paletteNum;
+        DATA.breakBarFirstVisiblePalette[battler] = palette;
+        DATA.breakBarFirstVisibleColors[battler][0] = gPlttBufferUnfaded[OBJ_PLTT_ID(palette) + 10];
+        DATA.breakBarFirstVisibleColors[battler][1] = gPlttBufferUnfaded[OBJ_PLTT_ID(palette) + 11];
+        memcpy(DATA.breakBarFirstVisibleTiles[battler],
+            (const void *)(OBJ_VRAM0 + (gSprites[bar].oam.tileNum + 2) * TILE_SIZE_4BPP),
+            sizeof(DATA.breakBarFirstVisibleTiles[battler]));
+        DATA.breakBarFirstVisibleMask |= 1u << battler;
+        gTasks[taskId].data[0] &= ~(1u << battler);
+    }
+    if (gTasks[taskId].data[0] == 0)
+        DestroyTask(taskId);
+}
+
+void TestRunner_Battle_InitializeBreakBars(void)
+{
+    bool32 observe = FALSE;
+    for (u32 trainer = 0; trainer < MAX_BATTLE_TRAINERS; trainer++)
+        for (u32 slot = 0; slot < PARTY_SIZE; slot++)
+        {
+            const struct BreakBarConfig *config = DATA.breakBarConfigs[trainer][slot];
+            if (config == NULL)
+                continue;
+            struct PartyState *state = &gBattleStruct->partyState[trainer][slot];
+            state->breakBarConfig = config;
+            state->breakBarsRemaining = GetInitialBreakBarCount(config);
+            state->breakBarsPeak = state->breakBarsRemaining;
+            observe |= state->breakBarsRemaining != 0;
+        }
+
+    if (observe)
+        CreateTask(Task_RecordFirstVisibleBreakBar, 0);
 }
 
 u32 TestRunner_Battle_GetForcedAbility(enum BattleTrainer trainer, u32 partyIndex)

@@ -2174,6 +2174,50 @@
 	.4byte \failInstr
 	.endm
 
+	@ Raise the active count by one using the owner's own config->phases[activeCount].
+	@ Plain: the current HP bar becomes the layer. Cover: the current HP/max HP is saved under a new full
+	@ layer and restored exactly on break, before the phase scripts run.
+	@ Jump to failInstr unless grantconfiguredbreakbar/grantconfiguredcoverbreakbar would succeed.
+	.macro canconfiguredbreakbar battler:req, failInstr:req
+	callnative BS_CanGrantConfiguredBreakBar
+	.byte \battler
+	.4byte \failInstr
+	.endm
+
+	.macro grantconfiguredbreakbar battler:req, failInstr:req
+	callnative BS_GrantConfiguredBreakBar
+	.byte \battler
+	.byte 0
+	.4byte \failInstr
+	callnative BS_AnimateConfiguredBreakBar
+	.byte \battler
+	.endm
+
+	@ Explicit presentation only; requires BREAK_BAR_INTRO_FILLS on the config.
+	@ Both commands leave HP, bar count and saved layers untouched.
+	.macro showbreakbarfills battler:req
+	callnative BS_StartBreakBarIntro
+	.byte \battler
+	callnative BS_ContinueBreakBarIntro
+	.byte \battler
+	.endm
+
+	@ Explicitly query eligibility into cMULTISTRING_CHOOSER (BREAK_BAR_GRANT_*).
+	@ This query has no side effects or developer log output.
+	.macro getconfiguredbreakbarresult battler:req
+	callnative BS_GetConfiguredBreakBarGrantResult
+	.byte \battler
+	.endm
+
+	.macro grantconfiguredcoverbreakbar battler:req, failInstr:req
+	callnative BS_GrantConfiguredBreakBar
+	.byte \battler
+	.byte 1
+	.4byte \failInstr
+	fillsavedbreakbar \battler
+	animatesavedbreakbar \battler
+	.endm
+
 	.macro fillsavedbreakbar battler:req
 	callnative BS_FillSavedBreakBar
 	.byte \battler

@@ -21,18 +21,12 @@ static const struct BreakBarConfig sStacks[] =
     {.extraBars = 5},
 };
 
-static u8 sExtraBars[MAX_BATTLERS_COUNT];
 static u8 sCountsAtTurn[MAX_BATTLERS_COUNT][8];
 
 static s32 BreakBarTestScore(u32 battlerAtk, u32 battlerDef, u32 move, s32 score)
 {
     for (u32 battler = 0; battler < gBattlersCount; battler++)
     {
-        // Explicit test registration, independent of species, ability, and side.
-        u32 initialPartyIndex = battler >= 2 ? 1 : 0;
-        if (sExtraBars[battler] != 0 && gBattlerPartyIndexes[battler] == initialPartyIndex
-         && GetBattlerPartyState(battler)->breakBarConfig == NULL)
-            ActivateBreakBar(battler, &sStacks[sExtraBars[battler] - 1]);
         if (gBattleResults.battleTurnCounter < ARRAY_COUNT(sCountsAtTurn[battler]))
             sCountsAtTurn[battler][gBattleResults.battleTurnCounter] = GetBreakBarCount(battler);
     }
@@ -41,7 +35,6 @@ static s32 BreakBarTestScore(u32 battlerAtk, u32 battlerDef, u32 move, s32 score
 
 static void BreakBarTestFixture(void)
 {
-    memset(sExtraBars, 0, sizeof(sExtraBars));
     memset(sCountsAtTurn, 0xFF, sizeof(sCountsAtTurn));
     sDynamicAiFunc = BreakBarTestScore;
 }
@@ -61,8 +54,7 @@ AI_SINGLE_BATTLE_TEST("Break Bar Lunar Dance stacks onto an existing bar and res
     GIVEN {
         AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
         BreakBarTestFixture();
-        sExtraBars[B_POSITION_PLAYER_LEFT] = layers;
-        PLAYER(SPECIES_WOBBUFFET) { HP(13); MaxHP(100); Moves(MOVE_CELEBRATE); }
+        PLAYER(SPECIES_WOBBUFFET) { BreakBars(&sStacks[layers - 1]); HP(13); MaxHP(100); Moves(MOVE_CELEBRATE); }
         PLAYER(SPECIES_GARDEVOIR) { Moves(MOVE_LUNAR_DANCE); }
         OPPONENT(SPECIES_WOBBUFFET) { Moves(MOVE_CELEBRATE); }
     } WHEN {
@@ -163,9 +155,8 @@ AI_SINGLE_BATTLE_TEST("Break Bar four and five extra layers deplete before the r
     GIVEN {
         AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
         BreakBarTestFixture();
-        sExtraBars[B_POSITION_OPPONENT_LEFT] = extraBars;
         PLAYER(SPECIES_WOBBUFFET) { Moves(MOVE_SEISMIC_TOSS); }
-        OPPONENT(SPECIES_WOBBUFFET) { HP(10); MaxHP(10); Moves(MOVE_CELEBRATE); }
+        OPPONENT(SPECIES_WOBBUFFET) { BreakBars(&sStacks[extraBars - 1]); HP(10); MaxHP(10); Moves(MOVE_CELEBRATE); }
         OPPONENT(SPECIES_PICHU) { Moves(MOVE_CELEBRATE); }
     } WHEN {
         for (u32 i = 0; i < extraBars; i++)
@@ -194,9 +185,8 @@ AI_SINGLE_BATTLE_TEST("Break Bar overkill consumes only one layer and does not t
     GIVEN {
         AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
         BreakBarTestFixture();
-        sExtraBars[B_POSITION_OPPONENT_LEFT] = 4;
         PLAYER(SPECIES_WOBBUFFET) { Moves(MOVE_SEISMIC_TOSS); }
-        OPPONENT(SPECIES_WOBBUFFET) { HP(1); MaxHP(10); Moves(MOVE_CELEBRATE); }
+        OPPONENT(SPECIES_WOBBUFFET) { BreakBars(&sStacks[3]); HP(1); MaxHP(10); Moves(MOVE_CELEBRATE); }
     } WHEN {
         TURN { MOVE(player, MOVE_SEISMIC_TOSS); }
     } SCENE {
@@ -220,9 +210,8 @@ AI_SINGLE_BATTLE_TEST("Break Bar resolves once after the full multi-hit move bef
     GIVEN {
         AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
         BreakBarTestFixture();
-        sExtraBars[B_POSITION_OPPONENT_LEFT] = 2;
         PLAYER(SPECIES_WOBBUFFET) { Moves(MOVE_DOUBLE_KICK); Attack(999); }
-        OPPONENT(SPECIES_WOBBUFFET) { HP(5); MaxHP(5); Defense(1); Moves(MOVE_CELEBRATE); }
+        OPPONENT(SPECIES_WOBBUFFET) { BreakBars(&sStacks[1]); HP(5); MaxHP(5); Defense(1); Moves(MOVE_CELEBRATE); }
     } WHEN {
         TURN { MOVE(player, MOVE_DOUBLE_KICK); }
     } SCENE {
@@ -245,9 +234,8 @@ AI_SINGLE_BATTLE_TEST("Break Bar poison stops at one HP without consuming a laye
     GIVEN {
         AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
         BreakBarTestFixture();
-        sExtraBars[B_POSITION_OPPONENT_LEFT] = 1;
         PLAYER(SPECIES_WOBBUFFET) { Moves(MOVE_CELEBRATE); }
-        OPPONENT(SPECIES_WOBBUFFET) { HP(hp); MaxHP(16); Status1(STATUS1_POISON); Moves(MOVE_CELEBRATE); }
+        OPPONENT(SPECIES_WOBBUFFET) { BreakBars(&sStacks[0]); HP(hp); MaxHP(16); Status1(STATUS1_POISON); Moves(MOVE_CELEBRATE); }
     } WHEN {
         TURN { MOVE(player, MOVE_CELEBRATE); }
     } SCENE {
@@ -268,9 +256,8 @@ AI_SINGLE_BATTLE_TEST("Break Bar catches delayed Future Sight damage")
     GIVEN {
         AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
         BreakBarTestFixture();
-        sExtraBars[B_POSITION_OPPONENT_LEFT] = 1;
         PLAYER(SPECIES_WOBBUFFET) { Moves(MOVE_FUTURE_SIGHT, MOVE_CELEBRATE); SpAttack(200); }
-        OPPONENT(SPECIES_WOBBUFFET) { HP(1); MaxHP(10); SpDefense(100); Moves(MOVE_CELEBRATE); }
+        OPPONENT(SPECIES_WOBBUFFET) { BreakBars(&sStacks[0]); HP(1); MaxHP(10); SpDefense(100); Moves(MOVE_CELEBRATE); }
     } WHEN {
         TURN { MOVE(player, MOVE_FUTURE_SIGHT); }
         TURN { MOVE(player, MOVE_CELEBRATE); }
@@ -291,9 +278,8 @@ AI_SINGLE_BATTLE_TEST("Break Bar recoil cannot consume a layer")
     GIVEN {
         AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
         BreakBarTestFixture();
-        sExtraBars[B_POSITION_OPPONENT_LEFT] = 1;
         PLAYER(SPECIES_WOBBUFFET) { HP(1000); MaxHP(1000); Defense(100); Moves(MOVE_CELEBRATE); }
-        OPPONENT(SPECIES_WOBBUFFET) { HP(1); MaxHP(10); Attack(100); Moves(MOVE_DOUBLE_EDGE); }
+        OPPONENT(SPECIES_WOBBUFFET) { BreakBars(&sStacks[0]); HP(1); MaxHP(10); Attack(100); Moves(MOVE_DOUBLE_EDGE); }
     } WHEN {
         TURN { MOVE(player, MOVE_CELEBRATE); }
     } SCENE {
@@ -314,9 +300,8 @@ AI_SINGLE_BATTLE_TEST("Break Bar depletion is not a Destiny Bond faint")
     GIVEN {
         AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
         BreakBarTestFixture();
-        sExtraBars[B_POSITION_OPPONENT_LEFT] = 1;
         PLAYER(SPECIES_WOBBUFFET) { Moves(MOVE_SEISMIC_TOSS); Speed(10); }
-        OPPONENT(SPECIES_WOBBUFFET) { HP(10); MaxHP(10); Moves(MOVE_DESTINY_BOND); Speed(20); }
+        OPPONENT(SPECIES_WOBBUFFET) { BreakBars(&sStacks[0]); HP(10); MaxHP(10); Moves(MOVE_DESTINY_BOND); Speed(20); }
     } WHEN {
         TURN { MOVE(player, MOVE_SEISMIC_TOSS); }
     } SCENE {
@@ -336,10 +321,9 @@ AI_SINGLE_BATTLE_TEST("Break Bar Perish Song consumes a layer without a true fai
     GIVEN {
         AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
         BreakBarTestFixture();
-        sExtraBars[B_POSITION_OPPONENT_LEFT] = 1;
         PLAYER(SPECIES_WOBBUFFET) { Moves(MOVE_PERISH_SONG); }
         PLAYER(SPECIES_PICHU) { Moves(MOVE_CELEBRATE); }
-        OPPONENT(SPECIES_WOBBUFFET) { HP(20); MaxHP(20); Moves(MOVE_CELEBRATE); Ability(ABILITY_RUN_AWAY); }
+        OPPONENT(SPECIES_WOBBUFFET) { BreakBars(&sStacks[0]); HP(20); MaxHP(20); Moves(MOVE_CELEBRATE); Ability(ABILITY_RUN_AWAY); }
     } WHEN {
         TURN { MOVE(player, MOVE_PERISH_SONG); }
         TURN { SWITCH(player, 1); }
@@ -360,9 +344,8 @@ AI_SINGLE_BATTLE_TEST("Break Bar does not end Neutralizing Gas on a temporary ze
     GIVEN {
         AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
         BreakBarTestFixture();
-        sExtraBars[B_POSITION_OPPONENT_LEFT] = 1;
         PLAYER(SPECIES_WOBBUFFET) { Moves(MOVE_SEISMIC_TOSS); }
-        OPPONENT(SPECIES_WOBBUFFET) { HP(10); MaxHP(10); Moves(MOVE_CELEBRATE); Ability(ABILITY_NEUTRALIZING_GAS); }
+        OPPONENT(SPECIES_WOBBUFFET) { BreakBars(&sStacks[0]); HP(10); MaxHP(10); Moves(MOVE_CELEBRATE); Ability(ABILITY_NEUTRALIZING_GAS); }
     } WHEN {
         TURN { MOVE(player, MOVE_SEISMIC_TOSS); }
     } SCENE {
@@ -381,9 +364,8 @@ AI_SINGLE_BATTLE_TEST("Break Bar belongs to its party member across switches")
     GIVEN {
         AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
         BreakBarTestFixture();
-        sExtraBars[B_POSITION_OPPONENT_LEFT] = 4;
         PLAYER(SPECIES_WOBBUFFET) { Moves(MOVE_SEISMIC_TOSS, MOVE_WHIRLWIND, MOVE_CELEBRATE); }
-        OPPONENT(SPECIES_WOBBUFFET) { HP(10); MaxHP(10); Moves(MOVE_CELEBRATE); Ability(ABILITY_RUN_AWAY); }
+        OPPONENT(SPECIES_WOBBUFFET) { BreakBars(&sStacks[3]); HP(10); MaxHP(10); Moves(MOVE_CELEBRATE); Ability(ABILITY_RUN_AWAY); }
         OPPONENT(SPECIES_PICHU) { Moves(MOVE_CELEBRATE); Ability(ABILITY_RUN_AWAY); }
     } WHEN {
         TURN { MOVE(player, MOVE_SEISMIC_TOSS); }
@@ -408,8 +390,7 @@ AI_SINGLE_BATTLE_TEST("Break Bar explicit registration also works on the player 
     GIVEN {
         AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
         BreakBarTestFixture();
-        sExtraBars[B_POSITION_PLAYER_LEFT] = 1;
-        PLAYER(SPECIES_WOBBUFFET) { HP(10); MaxHP(10); Moves(MOVE_CELEBRATE); }
+        PLAYER(SPECIES_WOBBUFFET) { BreakBars(&sStacks[0]); HP(10); MaxHP(10); Moves(MOVE_CELEBRATE); }
         OPPONENT(SPECIES_WOBBUFFET) { Moves(MOVE_SEISMIC_TOSS); }
     } WHEN {
         TURN { MOVE(player, MOVE_CELEBRATE); }
@@ -428,12 +409,10 @@ AI_DOUBLE_BATTLE_TEST("Break Bar different layer colors coexist in doubles and r
     GIVEN {
         AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
         BreakBarTestFixture();
-        sExtraBars[B_POSITION_OPPONENT_LEFT] = 1;
-        sExtraBars[B_POSITION_OPPONENT_RIGHT] = 5;
         PLAYER(SPECIES_WOBBUFFET) { Moves(MOVE_CELEBRATE); }
         PLAYER(SPECIES_WOBBUFFET) { Moves(MOVE_CELEBRATE); }
-        OPPONENT(SPECIES_WOBBUFFET) { Moves(MOVE_CELEBRATE); }
-        OPPONENT(SPECIES_WOBBUFFET) { Moves(MOVE_CELEBRATE); }
+        OPPONENT(SPECIES_WOBBUFFET) { BreakBars(&sStacks[0]); Moves(MOVE_CELEBRATE); }
+        OPPONENT(SPECIES_WOBBUFFET) { BreakBars(&sStacks[4]); Moves(MOVE_CELEBRATE); }
     } WHEN {
         TURN {}
     } THEN {

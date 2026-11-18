@@ -8,11 +8,17 @@
 #include "battle_scripts.h"
 #include "graphics.h"
 #include "palette.h"
+#include "pokemon.h"
 #include "sprite.h"
 #include "task.h"
 #include "constants/rgb.h"
 
 #define BREAK_BAR_FADE_FRAMES 16
+// Retained for possible future reuse. Entry/grant presentation must not lerp
+// from the ordinary green palette; keep this code compiled out.
+#define BREAK_BAR_ENABLE_LEGACY_LERP 0
+#define BREAK_BAR_GRANT_PIXELS_PER_FRAME 3
+#define BREAK_BAR_INTRO_BASE_FRAMES 12
 #define hMain_HealthBarSpriteId data[5]
 #define hMain_Battler data[6]
 
@@ -42,6 +48,20 @@ static const u16 sBreakBarPaletteTags[MAX_BATTLERS_COUNT] =
 };
 
 static u8 sLoadedBreakBarColors[MAX_BATTLERS_COUNT];
+static u32 GetHealthbarSprite(u32 battler);
+
+// Presentation state is separate from real HP, saved-layer fills and counts.
+static struct BreakBarFillAnimation
+{
+    struct PartyState *owner;
+    const struct BreakBarConfig *config;
+    u16 hp, maxHp;
+    u8 bars, color, pixels;
+    u8 healthbar, baseFrames;
+    bool8 active, preparing;
+} sBreakBarIntros[MAX_BATTLERS_COUNT], sBreakBarGrantFills[MAX_BATTLERS_COUNT];
+static void StartBreakBarFill(u32 battler, struct BreakBarFillAnimation *fill, u32 color);
+#if BREAK_BAR_ENABLE_LEGACY_LERP
 static void Task_BreakBarPaletteFade(u8 taskId);
 static bool32 HasFreeBreakBarFadeTask(void)
 {
@@ -50,6 +70,7 @@ static bool32 HasFreeBreakBarFadeTask(void)
             return TRUE;
     return FALSE;
 }
+#endif
 static bool8 sKazuraStackBreakerActive[MAX_BATTLERS_COUNT];
 static u8 sKazuraStackBreakerPixels[MAX_BATTLERS_COUNT];
 
@@ -82,7 +103,7 @@ void InitializeWildBreakBar(u32 partySlot, const struct BreakBarConfig *config)
         return;
     struct PartyState *state = &gBattleStruct->partyState[B_SIDE_OPPONENT][partySlot];
     state->breakBarConfig = config;
-    state->breakBarsRemaining = config->extraBars;
+    state->breakBarsRemaining = GetInitialBreakBarCount(config);
 }
 
 bool32 IsBreakBarCaptureBlocked(u32 battler)
@@ -94,8 +115,16 @@ bool32 IsBreakBarCaptureBlocked(u32 battler)
 bool32 IsBreakBarBase(u32 battler)
 {
     struct PartyState *owner = GetBreakBarOwner(battler);
+    // A START_INACTIVE config has not become a base until one of its bars has been active.
     return owner != NULL && owner->breakBarConfig != NULL
-        && owner->breakBarsRemaining == 0;
+        && owner->breakBarsRemaining == 0
+        && !((owner->breakBarConfig->flags & BREAK_BAR_START_INACTIVE) && owner->breakBarsPeak == 0);
+}
+
+// Bit n is only meaningful while saved layer n is active; drop the bits of layers that are gone.
+static void TrimCoverScripts(struct PartyState *owner)
+{
+    owner->breakBarCoverScripts &= (1u << owner->breakBarsRemaining) - 1;
 }
 
 bool32 CanInterceptBreakBar(u32 battler)
@@ -132,14 +161,86 @@ bool32 GrantSavedBreakBar(u32 battler)
         return FALSE;
     u32 layer = owner->breakBarsRemaining;
     if (layer == 0)
-        owner->breakBarSavedBaseWasRegistered = owner->breakBarConfig != NULL;
+        owner->breakBarSavedBaseWasRegistered = IsBreakBarBase(battler);
     owner->breakBarSavedHp[layer] = ReductionCanonicalHp(battler);
     owner->breakBarSavedMaxHp[layer] = ReductionCanonicalMaxHp(battler);
     owner->breakBarFillPixels = 0;
+    owner->breakBarCoverScripts &= ~(1u << layer); // An ordinary saved layer never runs phase scripts.
     if (owner->breakBarConfig == NULL)
         owner->breakBarConfig = &sSavedBreakBarConfig;
     owner->breakBarsRemaining++;
     owner->breakBarsPeak = max(owner->breakBarsPeak, owner->breakBarsRemaining);
+    return TRUE;
+}
+
+enum BreakBarGrantResult GetConfiguredBreakBarGrantResult(u32 battler)
+{
+    struct PartyState *owner = GetBreakBarOwner(battler);
+    if (owner == NULL)
+        return BREAK_BAR_GRANT_NO_OWNER;
+    if (owner->breakBarConfig == NULL)
+        return BREAK_BAR_GRANT_NO_CONFIG;
+    if (owner->breakBarConfig->extraBars == 0 || owner->breakBarConfig->extraBars > BREAK_BAR_MAX_EXTRA_BARS)
+        return BREAK_BAR_GRANT_INVALID_CONFIG;
+    if (owner->breakBarPending)
+        return BREAK_BAR_GRANT_PENDING;
+    if (!IsBattlerAlive(battler))
+        return BREAK_BAR_GRANT_NOT_ALIVE;
+    if (owner->breakBarsRemaining >= owner->breakBarConfig->extraBars)
+        return BREAK_BAR_GRANT_FULL;
+    return BREAK_BAR_GRANT_READY;
+}
+
+bool32 CanGrantConfiguredBreakBar(u32 battler)
+{
+    return GetConfiguredBreakBarGrantResult(battler) == BREAK_BAR_GRANT_READY;
+}
+
+bool32 GrantConfiguredBreakBar(u32 battler, u32 flags)
+{
+    enum BreakBarGrantResult result = GetConfiguredBreakBarGrantResult(battler);
+    if (result != BREAK_BAR_GRANT_READY)
+    {
+#ifndef RELEASE
+        static const char *const reasons[] =
+        {
+            [BREAK_BAR_GRANT_NO_OWNER] = "no owner",
+            [BREAK_BAR_GRANT_NO_CONFIG] = "no configuration",
+            [BREAK_BAR_GRANT_INVALID_CONFIG] = "invalid configuration",
+            [BREAK_BAR_GRANT_PENDING] = "pending break",
+            [BREAK_BAR_GRANT_NOT_ALIVE] = "dead or absent owner",
+            [BREAK_BAR_GRANT_FULL] = "configured capacity full",
+        };
+        DebugPrintf("BREAK_BAR_GRANT_REJECT battler=%u reason=%s", battler, reasons[result]);
+#endif
+        return FALSE;
+    }
+    struct PartyState *owner = GetBreakBarOwner(battler);
+
+    // phases[] is indexed by stack position, so the next configured phase is the next free position.
+    // A position already taken (for example by an ordinary saved layer) cannot be granted over.
+    u32 layer = owner->breakBarsRemaining;
+    if (flags & BREAK_BAR_GRANT_COVER)
+    {
+        if (layer == 0)
+            owner->breakBarSavedBaseWasRegistered = IsBreakBarBase(battler);
+        owner->breakBarSavedHp[layer] = ReductionCanonicalHp(battler);
+        owner->breakBarSavedMaxHp[layer] = ReductionCanonicalMaxHp(battler);
+        owner->breakBarCoverScripts |= 1u << layer;
+    }
+    owner->breakBarFillPixels = 0;
+    owner->breakBarsRemaining++;
+    owner->breakBarsPeak = max(owner->breakBarsPeak, owner->breakBarsRemaining);
+    sBreakBarGrantFills[battler].active = FALSE;
+    // Every grant script waits for a fill. Plain layers use the visual-only
+    // fraction; covering layers use the existing explicit HP/saved-fill natives.
+    if (!(flags & BREAK_BAR_GRANT_COVER))
+    {
+        RefreshBreakBarPalette(battler, FALSE);
+        if (GetHealthbarSprite(battler) != MAX_SPRITES)
+            UpdateHealthboxAttribute(gHealthboxSpriteIds[battler], GetBattlerMon(battler), HEALTHBOX_HEALTH_BAR);
+        StartBreakBarFill(battler, &sBreakBarGrantFills[battler], owner->breakBarsRemaining);
+    }
     return TRUE;
 }
 
@@ -157,14 +258,16 @@ static u32 GetHealthbarSprite(u32 battler)
     return healthbar;
 }
 
-static void StopBreakBarFade(u32 battler)
+static void StopBreakBarFade(u32 battler UNUSED)
 {
+#if BREAK_BAR_ENABLE_LEGACY_LERP
     for (u32 taskId = 0; taskId < NUM_TASKS; taskId++)
     {
         if (gTasks[taskId].isActive && gTasks[taskId].func == Task_BreakBarPaletteFade
          && gTasks[taskId].data[0] == battler)
             DestroyTask(taskId);
     }
+#endif
 }
 
 static void BuildBreakBarPalette(u32 color, u16 *palette)
@@ -174,11 +277,10 @@ static void BuildBreakBarPalette(u32 color, u16 *palette)
     palette[11] = sBreakBarFillColors[color][1];
 }
 
-void RefreshBreakBarPalette(u32 battler, bool32 animate)
+static void SetBreakBarPalette(u32 battler, u32 color, bool32 animate UNUSED, const u16 *paletteOverride)
 {
-    if (battler >= gBattlersCount)
+    if (battler >= gBattlersCount || color > BREAK_BAR_MAX_EXTRA_BARS)
         return;
-    u32 color = GetBreakBarCount(battler);
     // Ordinary battlers need no palette lookup or task scan on each HP-bar frame.
     if (color == 0 && sLoadedBreakBarColors[battler] == 0)
         return;
@@ -200,10 +302,13 @@ void RefreshBreakBarPalette(u32 battler, bool32 animate)
     }
 
     u16 palette[16];
-    if (slot == 0xFF || sLoadedBreakBarColors[battler] != color)
+    if (slot == 0xFF || sLoadedBreakBarColors[battler] != color || paletteOverride != NULL)
     {
         StopBreakBarFade(battler);
-        BuildBreakBarPalette(color, palette);
+        if (paletteOverride != NULL)
+            memcpy(palette, paletteOverride, sizeof(palette));
+        else
+            BuildBreakBarPalette(color, palette);
         if (slot == 0xFF)
         {
             const struct SpritePalette spritePalette = {palette, tag};
@@ -213,8 +318,11 @@ void RefreshBreakBarPalette(u32 battler, bool32 animate)
         }
         else
             LoadPalette(palette, OBJ_PLTT_ID(slot), PLTT_SIZE_4BPP);
-        sLoadedBreakBarColors[battler] = color;
+        // A composed intro palette must not be mistaken for the ordinary
+        // cached palette when completion/cancellation restores real HP.
+        sLoadedBreakBarColors[battler] = paletteOverride != NULL ? 0xFF : color;
 
+#if BREAK_BAR_ENABLE_LEGACY_LERP
         // CreateTask returns 0 on exhaustion, so check capacity before using its ID.
         if (animate && HasFreeBreakBarFadeTask())
         {
@@ -223,10 +331,236 @@ void RefreshBreakBarPalette(u32 battler, bool32 animate)
             gTasks[taskId].data[0] = battler;
             gTasks[taskId].data[1] = color;
         }
+#endif
     }
     gSprites[healthbar].oam.paletteNum = slot;
 }
 
+static void SetBreakBarIntroPalette(u32 battler, u32 color, const u16 *topColors, const u16 *underlyingColors)
+{
+    u16 palette[16];
+    BuildBreakBarPalette(color, palette);
+    if (topColors != NULL)
+        memcpy(&palette[10], topColors, 2 * sizeof(u16));
+    memcpy(&palette[14], underlyingColors, 2 * sizeof(u16));
+    // Load the complete composition at once; never expose a temporary red base.
+    SetBreakBarPalette(battler, color, FALSE, palette);
+}
+
+static bool32 CanPresentBreakBarIntro(u32 battler)
+{
+    struct PartyState *owner = GetBreakBarOwner(battler);
+    return owner != NULL && owner->breakBarConfig != NULL
+        && (owner->breakBarConfig->flags & BREAK_BAR_INTRO_FILLS)
+        && !(owner->breakBarConfig->flags & BREAK_BAR_DEFER_INITIAL_DRAW)
+        && owner->breakBarsRemaining != 0
+        && owner->breakBarsRemaining <= BREAK_BAR_MAX_EXTRA_BARS
+        && !owner->breakBarPending && gBattleMons[battler].hp != 0
+        && gBattleMons[battler].maxHP != 0
+        && !(gAbsentBattlerFlags & (1u << battler));
+}
+
+static bool32 ShouldDrawBreakBarIntroBase(u32 battler)
+{
+    return CanPresentBreakBarIntro(battler)
+        && !(GetBreakBarOwner(battler)->breakBarConfig->flags & BREAK_BAR_START_INACTIVE)
+        && !GetBreakBarOwner(battler)->breakBarIntroShown;
+}
+
+void RefreshBreakBarPalette(u32 battler, bool32 animate)
+{
+    if (ShouldDrawBreakBarIntroBase(battler))
+        SetBreakBarIntroPalette(battler, BREAK_BAR_PURPLE,
+            &gBattleInterface_BallDisplayPal[10], &gBattleInterface_BallDisplayPal[10]);
+    else
+        SetBreakBarPalette(battler, GetBreakBarCount(battler), animate, NULL);
+}
+
+bool32 DrawBreakBarIntroBase(u32 battler)
+{
+    if (!ShouldDrawBreakBarIntroBase(battler))
+        return FALSE;
+    // Keep ordinary green indices until startup has yielded for VBlank. Both
+    // the old shared slot and this private slot map these tiles to green.
+    return DrawHealthbarOverlay(battler, 0, 1, B_HEALTHBAR_PIXELS);
+}
+
+bool32 TryShowBreakBarIntro(void)
+{
+    if (gBattleResources->battleScriptsStack->size
+        >= ARRAY_COUNT(gBattleResources->battleScriptsStack->ptr))
+        return FALSE;
+    for (u32 battler = 0; battler < gBattlersCount; battler++)
+    {
+        if (gBattleStruct->battlerState[battler].switchIn && CanPresentBreakBarIntro(battler)
+         && !GetBreakBarOwner(battler)->breakBarIntroShown)
+        {
+            gBattleScripting.battler = battler;
+            BattleScriptCall(BattleScript_BreakBarIntro);
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+static void StartBreakBarFill(u32 battler, struct BreakBarFillAnimation *fill, u32 color)
+{
+    struct PartyState *owner = GetBreakBarOwner(battler);
+    StopBreakBarFade(battler);
+    fill->owner = owner;
+    fill->config = owner->breakBarConfig;
+    fill->hp = gBattleMons[battler].hp;
+    fill->maxHp = gBattleMons[battler].maxHP;
+    fill->bars = owner->breakBarsRemaining;
+    fill->color = color;
+    fill->pixels = 0;
+    fill->baseFrames = fill == &sBreakBarIntros[battler] ? BREAK_BAR_INTRO_BASE_FRAMES : 0;
+    fill->preparing = fill == &sBreakBarIntros[battler];
+    fill->healthbar = GetHealthbarSprite(battler);
+    fill->active = TRUE;
+}
+
+static void FinishBreakBarFill(u32 battler, struct BreakBarFillAnimation *fill)
+{
+    fill->active = FALSE;
+    if (fill == &sBreakBarIntros[battler])
+    {
+        u32 slot = IndexOfSpritePaletteTag(sBreakBarPaletteTags[battler]);
+        if (slot != 0xFF)
+            LoadPalette(&sBreakBarBasePalette[14], OBJ_PLTT_ID(slot) + 14, 2 * sizeof(u16));
+    }
+    RefreshBreakBarPalette(battler, FALSE);
+    if (GetBreakBarOwner(battler) != NULL && GetHealthbarSprite(battler) != MAX_SPRITES)
+        UpdateHealthboxAttribute(gHealthboxSpriteIds[battler], GetBattlerMon(battler), HEALTHBOX_HEALTH_BAR);
+}
+
+// TRUE keeps the caller on this frame command; FALSE completes/cancels it.
+static bool32 AnimateBreakBarFill(u32 battler, struct BreakBarFillAnimation *fill)
+{
+    if (!fill->active)
+        return FALSE;
+    if (battler >= gBattlersCount || gBattleStruct == NULL)
+    {
+        fill->active = FALSE;
+        return FALSE;
+    }
+    if (gBattleControllerExecFlags)
+        return TRUE;
+
+    struct PartyState *owner = GetBreakBarOwner(battler);
+    // Never paint a replacement owner, stale healthbox or a changing gameplay bar.
+    if (owner != fill->owner
+     || owner->breakBarConfig != fill->config
+     || owner->breakBarsRemaining != fill->bars
+     || owner->breakBarPending || gBattleMons[battler].hp == 0
+     || gBattleMons[battler].hp != fill->hp
+     || gBattleMons[battler].maxHP != fill->maxHp || fill->maxHp == 0
+     || (gAbsentBattlerFlags & (1u << battler))
+     || GetHealthbarSprite(battler) == MAX_SPRITES
+     || GetHealthbarSprite(battler) != fill->healthbar)
+    {
+        FinishBreakBarFill(battler, fill);
+        return FALSE;
+    }
+
+    u32 color = fill->color;
+    u32 target = B_HEALTHBAR_PIXELS;
+    if (color == fill->bars)
+        target = max(1, min((u32)fill->hp * B_HEALTHBAR_PIXELS / fill->maxHp, B_HEALTHBAR_PIXELS));
+    u32 pixels = min(fill->pixels, target);
+    bool32 intro = fill == &sBreakBarIntros[battler];
+    if (fill->preparing)
+    {
+        u32 oldSlot = OBJ_PLTT_ID(gSprites[fill->healthbar].oam.paletteNum);
+        // Explicit reveals may start over a colored bar. Preserve its visible
+        // top while staging green in the hidden pair, then yield for VBlank
+        // before changing any tile indices or the top color.
+        SetBreakBarIntroPalette(battler, color, &gPlttBufferUnfaded[oldSlot + 10],
+            &gBattleInterface_BallDisplayPal[10]);
+        if (IndexOfSpritePaletteTag(sBreakBarPaletteTags[battler]) == 0xFF)
+        {
+            FinishBreakBarFill(battler, fill);
+            return FALSE;
+        }
+        fill->preparing = FALSE;
+        return TRUE;
+    }
+    if (intro)
+        SetBreakBarIntroPalette(battler, color, NULL, color == BREAK_BAR_PURPLE
+            ? &gBattleInterface_BallDisplayPal[10] : sBreakBarFillColors[color - 1]);
+    else
+        SetBreakBarPalette(battler, color, FALSE, NULL);
+    u32 slot = IndexOfSpritePaletteTag(sBreakBarPaletteTags[battler]);
+    u32 basePixels = 0;
+    if (intro && slot != 0xFF)
+    {
+        // Keep the preceding layer under this fill. A partial final layer
+        // retracts the uncovered edge gradually, ending at authoritative HP.
+        basePixels = B_HEALTHBAR_PIXELS;
+        if (fill->baseFrames == 0 && color == fill->bars)
+            basePixels = target + (B_HEALTHBAR_PIXELS - target) * (target - pixels) / target;
+    }
+    // Palette exhaustion skips the optional presentation rather than using a wrong color.
+    if (slot == 0xFF
+     || !DrawHealthbarOverlay(battler, basePixels, B_HEALTHBAR_PIXELS, pixels))
+    {
+        FinishBreakBarFill(battler, fill);
+        return FALSE;
+    }
+    if (fill->baseFrames != 0)
+    {
+        fill->baseFrames--;
+        return TRUE;
+    }
+    if (pixels == target)
+    {
+        if (color == fill->bars)
+        {
+            FinishBreakBarFill(battler, fill);
+            return FALSE;
+        }
+        // All visible pixels now use the top pair. Prepare the hidden pair
+        // before the next frame uses it as the completed underlying layer.
+        LoadPalette(sBreakBarFillColors[color], OBJ_PLTT_ID(slot) + 14, 2 * sizeof(u16));
+        fill->color++;
+        fill->pixels = 0;
+    }
+    else
+        fill->pixels = min(pixels + (intro ? 1 : BREAK_BAR_GRANT_PIXELS_PER_FRAME), target);
+    return TRUE;
+}
+
+bool32 AnimateBreakBarIntro(u32 battler)
+{
+    if (battler >= gBattlersCount)
+        return FALSE;
+    if (gBattleControllerExecFlags)
+        return TRUE;
+    if (!sBreakBarIntros[battler].active)
+    {
+        if (!CanPresentBreakBarIntro(battler) || GetBreakBarOwner(battler)->breakBarIntroShown)
+            return FALSE;
+        GetBreakBarOwner(battler)->breakBarIntroShown = TRUE;
+        StartBreakBarFill(battler, &sBreakBarIntros[battler], BREAK_BAR_PURPLE);
+    }
+    return AnimateBreakBarFill(battler, &sBreakBarIntros[battler]);
+}
+
+void BS_AnimateBreakBarIntro(void)
+{
+    NATIVE_ARGS();
+    if (!AnimateBreakBarIntro(gBattleScripting.battler))
+        gBattlescriptCurrInstr = cmd->nextInstr;
+}
+
+bool32 AnimateConfiguredBreakBar(u32 battler)
+{
+    if (battler >= MAX_BATTLERS_COUNT)
+        return FALSE;
+    return AnimateBreakBarFill(battler, &sBreakBarGrantFills[battler]);
+}
+
+#if BREAK_BAR_ENABLE_LEGACY_LERP
 static void Task_BreakBarPaletteFade(u8 taskId)
 {
     u32 battler = gTasks[taskId].data[0];
@@ -263,6 +597,7 @@ static void Task_BreakBarPaletteFade(u8 taskId)
     else
         gTasks[taskId].data[2]++;
 }
+#endif
 
 bool32 ActivateBreakBar(u32 battler, const struct BreakBarConfig *config)
 {
@@ -273,11 +608,13 @@ bool32 ActivateBreakBar(u32 battler, const struct BreakBarConfig *config)
         return FALSE;
 
     owner->breakBarConfig = config;
-    owner->breakBarsRemaining = config->extraBars;
+    owner->breakBarsRemaining = GetInitialBreakBarCount(config);
+    owner->breakBarCoverScripts = 0;
+    owner->breakBarIntroShown = FALSE;
     owner->breakBarsPeak = max(owner->breakBarsPeak, owner->breakBarsRemaining);
-    if (!(config->flags & BREAK_BAR_DEFER_INITIAL_DRAW))
+    if (owner->breakBarsRemaining != 0 && !(config->flags & BREAK_BAR_DEFER_INITIAL_DRAW))
     {
-        RefreshBreakBarPalette(battler, TRUE);
+        RefreshBreakBarPalette(battler, FALSE);
         if (GetHealthbarSprite(battler) != MAX_SPRITES)
             UpdateHealthboxAttribute(gHealthboxSpriteIds[battler], GetBattlerMon(battler), HEALTHBOX_HEALTH_BAR);
     }
@@ -298,8 +635,12 @@ bool32 TryBreakBar(u32 battler, const u8 *returnInstr)
 
     u32 phase = owner->breakBarsRemaining - 1;
     bool32 savedLayer = owner->breakBarSavedMaxHp[phase] != 0;
-    const u8 *afterScript = savedLayer ? NULL : config->phases[phase].afterBreakScript;
-    u32 scriptCount = 2 + (afterScript != NULL);
+    // A covering layer granted from the phase table keeps its scripts: restore, then onBreak, then after.
+    bool32 coverScripts = savedLayer && (owner->breakBarCoverScripts & (1u << phase));
+    const u8 *onScript = config->phases[phase].onBreakScript;
+    const u8 *afterScript = (savedLayer && !coverScripts) ? NULL : config->phases[phase].afterBreakScript;
+    bool32 pushOnScript = coverScripts && onScript != NULL; // NULL on a covering layer is "nothing", never a refill
+    u32 scriptCount = 2 + (afterScript != NULL) + pushOnScript;
     // Preserve the original target while phase scripts operate on the bar owner.
     if (gBattleStruct->savedTargetCount >= ARRAY_COUNT(gBattleStruct->savedBattlerTarget)
      || gBattleResources->battleScriptsStack->size + scriptCount
@@ -310,12 +651,15 @@ bool32 TryBreakBar(u32 battler, const u8 *returnInstr)
 
     owner->breakBarPending = FALSE;
     owner->breakBarsRemaining--;
+    TrimCoverScripts(owner);
     RefreshBreakBarPalette(battler, FALSE);
     BattleScriptPush(returnInstr);
     BattleScriptPush(BattleScript_BreakBarReturn);
     if (afterScript != NULL)
         BattleScriptPush(afterScript);
-    gBattlescriptCurrInstr = savedLayer ? BattleScript_RestoreSavedBreakBar : config->phases[phase].onBreakScript;
+    if (pushOnScript)
+        BattleScriptPush(onScript);
+    gBattlescriptCurrInstr = savedLayer ? BattleScript_RestoreSavedBreakBar : onScript;
     if (gBattlescriptCurrInstr == NULL)
         gBattlescriptCurrInstr = BattleScript_BreakBarRefill;
     return TRUE;
@@ -429,6 +773,7 @@ void BS_AnimateKazuraStackBreaker(void)
         if (owner != NULL)
         {
             owner->breakBarsRemaining = 0;
+            TrimCoverScripts(owner);
             owner->breakBarPending = FALSE;
             owner->breakBarFillPixels = 0;
         }
@@ -450,6 +795,7 @@ void BS_AnimateKazuraStackBreaker(void)
     if (hasExtraBars)
     {
         owner->breakBarsRemaining--;
+        TrimCoverScripts(owner);
         owner->breakBarPending = FALSE;
         owner->breakBarFillPixels = 0;
 
@@ -481,6 +827,7 @@ void BS_ExhaustBreakBars(void)
     {
         owner->breakBarPending = FALSE;
         owner->breakBarsRemaining = 0;
+        TrimCoverScripts(owner);
         owner->breakBarFillPixels = 0;
 
         RefreshBreakBarPalette(battler, FALSE);
@@ -500,6 +847,62 @@ bool32 TryResolveBreakBarsAfterMove(void)
         }
     }
     return FALSE;
+}
+
+void BS_CanGrantConfiguredBreakBar(void)
+{
+    NATIVE_ARGS(u8 battler, const u8 *failInstr);
+    u32 battler = GetBattlerForBattleScript(cmd->battler);
+    gBattlescriptCurrInstr = CanGrantConfiguredBreakBar(battler) ? cmd->nextInstr : cmd->failInstr;
+}
+
+void BS_GrantConfiguredBreakBar(void)
+{
+    NATIVE_ARGS(u8 battler, u8 flags, const u8 *failInstr);
+    if (gBattleControllerExecFlags)
+        return;
+    u32 battler = GetBattlerForBattleScript(cmd->battler);
+    gBattlescriptCurrInstr = GrantConfiguredBreakBar(battler, cmd->flags) ? cmd->nextInstr : cmd->failInstr;
+}
+
+void BS_GetConfiguredBreakBarGrantResult(void)
+{
+    NATIVE_ARGS(u8 battler);
+    gBattleCommunication[MULTISTRING_CHOOSER] = GetConfiguredBreakBarGrantResult(GetBattlerForBattleScript(cmd->battler));
+    gBattlescriptCurrInstr = cmd->nextInstr;
+}
+
+void BS_AnimateConfiguredBreakBar(void)
+{
+    NATIVE_ARGS(u8 battler);
+    if (!AnimateConfiguredBreakBar(GetBattlerForBattleScript(cmd->battler)))
+        gBattlescriptCurrInstr = cmd->nextInstr;
+}
+
+void BS_StartBreakBarIntro(void)
+{
+    NATIVE_ARGS(u8 battler);
+    if (gBattleControllerExecFlags)
+        return;
+    u32 battler = GetBattlerForBattleScript(cmd->battler);
+    if (battler < MAX_BATTLERS_COUNT)
+    {
+        sBreakBarIntros[battler].active = FALSE;
+        if (CanPresentBreakBarIntro(battler))
+        {
+            GetBreakBarOwner(battler)->breakBarIntroShown = TRUE;
+            StartBreakBarFill(battler, &sBreakBarIntros[battler], BREAK_BAR_PURPLE);
+        }
+    }
+    gBattlescriptCurrInstr = cmd->nextInstr;
+}
+
+void BS_ContinueBreakBarIntro(void)
+{
+    NATIVE_ARGS(u8 battler);
+    u32 battler = GetBattlerForBattleScript(cmd->battler);
+    if (battler >= MAX_BATTLERS_COUNT || !AnimateBreakBarFill(battler, &sBreakBarIntros[battler]))
+        gBattlescriptCurrInstr = cmd->nextInstr;
 }
 
 void BS_FillSavedBreakBar(void)
@@ -734,6 +1137,8 @@ void BS_RevealSavedBreakBar(void)
 
 void ReshowBreakBars(void)
 {
+    memset(sBreakBarIntros, 0, sizeof(sBreakBarIntros));
+    memset(sBreakBarGrantFills, 0, sizeof(sBreakBarGrantFills));
     for (u32 battler = 0; battler < gBattlersCount; battler++)
     {
         StopBreakBarFade(battler);
@@ -747,6 +1152,8 @@ void ReshowBreakBars(void)
 
 void FreeBreakBarGraphics(void)
 {
+    memset(sBreakBarIntros, 0, sizeof(sBreakBarIntros));
+    memset(sBreakBarGrantFills, 0, sizeof(sBreakBarGrantFills));
     for (u32 battler = 0; battler < MAX_BATTLERS_COUNT; battler++)
     {
         StopBreakBarFade(battler);
