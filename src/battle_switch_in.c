@@ -1,6 +1,7 @@
 #include "global.h"
 #include "battle.h"
 #include "battle_break_bar.h"
+#include "battle_entry_scripts.h"
 #include "battle_hold_effects.h"
 #include "battle_stat_change.h"
 #include "battle_util.h"
@@ -158,6 +159,21 @@ bool32 DoSwitchInEvents(void)
         {
             enum BattlerId battler = gBattlersByRawSpeed[gBattleStruct->switchInBattlerCounter++];
             if (ItemBattleEffects(battler, 0, calcValues.holdEffects[battler], IsMirrorHerbActivation))
+                return TRUE;
+        }
+        gBattleStruct->switchInBattlerCounter = 0;
+        gBattleStruct->eventState.switchIn++;
+        break;
+    case SWITCH_IN_EVENTS_CONFIGURED_SCRIPTS:
+        if (gBattleOutcome != 0)
+        {
+            gBattleStruct->eventState.switchIn = SWITCH_IN_EVENTS_COUNT;
+            break;
+        }
+        while (gBattleStruct->switchInBattlerCounter < gBattlersCount)
+        {
+            battler = gBattlersBySpeed[gBattleStruct->switchInBattlerCounter++];
+            if (TryRunMonEntryScript(battler))
                 return TRUE;
         }
         gBattleStruct->switchInBattlerCounter = 0;

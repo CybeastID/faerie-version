@@ -4,8 +4,11 @@
 struct ScriptContext;
 struct TrainerBreakBarRules;
 struct BreakBarConfig;
+struct TrainerBattleScripts;
+struct WildBattleScripts;
 
 #define TRAINER_BREAK_BAR_OVERRIDE_COUNT 2
+#define TRAINER_BATTLE_SCRIPT_OVERRIDE_COUNT 2
 
 typedef bool8 (*ScrCmdFunc)(struct ScriptContext *);
 typedef u8 Script[];
@@ -34,6 +37,10 @@ struct ScriptContext
     u16 trainerBreakBarIds[TRAINER_BREAK_BAR_OVERRIDE_COUNT];
     const struct BreakBarConfig *wildBreakBarConfig;
     bool8 wildBreakBarArmed;
+    const struct TrainerBattleScripts *trainerBattleScripts[TRAINER_BATTLE_SCRIPT_OVERRIDE_COUNT];
+    u16 trainerBattleScriptIds[TRAINER_BATTLE_SCRIPT_OVERRIDE_COUNT];
+    const struct WildBattleScripts *wildBattleScripts;
+    bool8 wildBattleScriptsArmed;
 };
 
 #define ScriptReadByte(ctx) (*(ctx->scriptPtr++))
@@ -66,6 +73,12 @@ void Script_SetWildBreakBars(struct ScriptContext *ctx);
 void Script_ArmWildBreakBars(struct ScriptContext *ctx);
 const struct BreakBarConfig *Script_TakeWildBreakBarOverride(void);
 void Script_ClearWildBreakBarOverride(void);
+void Script_SetTrainerBattleScripts(struct ScriptContext *ctx);
+const struct TrainerBattleScripts *Script_TakeTrainerBattleScripts(u16 trainerId);
+void Script_SetWildBattleScripts(struct ScriptContext *ctx);
+void Script_ArmWildBattleScripts(struct ScriptContext *ctx);
+const struct WildBattleScripts *Script_TakeWildBattleScripts(void);
+void Script_ClearBattleScripts(void);
 
 void InitScriptContext(struct ScriptContext *ctx, void *cmdTable, void *cmdTableEnd);
 u8 SetupBytecodeScript(struct ScriptContext *ctx, const u8 *ptr);

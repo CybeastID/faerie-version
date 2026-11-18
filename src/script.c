@@ -16,6 +16,7 @@
 #include "dexnav.h"
 #include "trainer_break_bars.h"
 #include "battle_break_bar.h"
+#include "battle_entry_scripts.h"
 #include "constants/trainers.h"
 
 #define RAM_SCRIPT_MAGIC 51
@@ -54,6 +55,9 @@ void InitScriptContext(struct ScriptContext *ctx, void *cmdTable, void *cmdTable
 {
     s32 i;
 
+    memset(ctx->trainerBattleScripts, 0, sizeof(ctx->trainerBattleScripts));
+    ctx->wildBattleScripts = NULL;
+    ctx->wildBattleScriptsArmed = FALSE;
     memset(ctx->trainerBreakBarRules, 0, sizeof(ctx->trainerBreakBarRules));
     ctx->wildBreakBarConfig = NULL;
     ctx->wildBreakBarArmed = FALSE;
@@ -89,6 +93,9 @@ void SetupNativeScript(struct ScriptContext *ctx, bool8 (*ptr)(void))
 void StopScript(struct ScriptContext *ctx)
 {
     assertf(!FuncIsActiveTask(Task_WarpAndLoadMap), "Leaving script while a warp is in progress: try adding a waitstate");
+    memset(ctx->trainerBattleScripts, 0, sizeof(ctx->trainerBattleScripts));
+    ctx->wildBattleScripts = NULL;
+    ctx->wildBattleScriptsArmed = FALSE;
     memset(ctx->trainerBreakBarRules, 0, sizeof(ctx->trainerBreakBarRules));
     ctx->wildBreakBarConfig = NULL;
     ctx->wildBreakBarArmed = FALSE;
@@ -789,6 +796,65 @@ void Script_ClearWildBreakBarOverride(void)
 {
     sGlobalScriptContext.wildBreakBarConfig = NULL;
     sGlobalScriptContext.wildBreakBarArmed = FALSE;
+}
+
+void Script_SetTrainerBattleScripts(struct ScriptContext *ctx)
+{
+    u16 trainerId = VarGet(ScriptReadHalfword(ctx));
+    const struct TrainerBattleScripts *config = (const struct TrainerBattleScripts *)ScriptReadWord(ctx);
+    Script_RequestEffects(SCREFF_V1);
+    gSpecialVar_Result = FALSE;
+    if (trainerId == TRAINER_NONE || trainerId >= TRAINERS_COUNT || config == NULL)
+        return;
+    for (u32 i = 0; i < ARRAY_COUNT(ctx->trainerBattleScripts); i++)
+    {
+        if (ctx->trainerBattleScripts[i] != NULL && ctx->trainerBattleScriptIds[i] != trainerId)
+            continue;
+        ctx->trainerBattleScriptIds[i] = trainerId;
+        ctx->trainerBattleScripts[i] = config;
+        gSpecialVar_Result = TRUE;
+        return;
+    }
+}
+
+const struct TrainerBattleScripts *Script_TakeTrainerBattleScripts(u16 trainerId)
+{
+    for (u32 i = 0; i < ARRAY_COUNT(sGlobalScriptContext.trainerBattleScripts); i++)
+        if (sGlobalScriptContext.trainerBattleScripts[i] != NULL && sGlobalScriptContext.trainerBattleScriptIds[i] == trainerId)
+        {
+            const struct TrainerBattleScripts *config = sGlobalScriptContext.trainerBattleScripts[i];
+            sGlobalScriptContext.trainerBattleScripts[i] = NULL;
+            return config;
+        }
+    return NULL;
+}
+
+void Script_SetWildBattleScripts(struct ScriptContext *ctx)
+{
+    Script_RequestEffects(SCREFF_V1);
+    ctx->wildBattleScripts = (const struct WildBattleScripts *)ScriptReadWord(ctx);
+    ctx->wildBattleScriptsArmed = FALSE;
+    gSpecialVar_Result = ctx->wildBattleScripts != NULL;
+}
+
+void Script_ArmWildBattleScripts(struct ScriptContext *ctx)
+{
+    ctx->wildBattleScriptsArmed = ctx->wildBattleScripts != NULL;
+}
+
+const struct WildBattleScripts *Script_TakeWildBattleScripts(void)
+{
+    const struct WildBattleScripts *config = sGlobalScriptContext.wildBattleScriptsArmed ? sGlobalScriptContext.wildBattleScripts : NULL;
+    sGlobalScriptContext.wildBattleScripts = NULL;
+    sGlobalScriptContext.wildBattleScriptsArmed = FALSE;
+    return config;
+}
+
+void Script_ClearBattleScripts(void)
+{
+    memset(sGlobalScriptContext.trainerBattleScripts, 0, sizeof(sGlobalScriptContext.trainerBattleScripts));
+    sGlobalScriptContext.wildBattleScripts = NULL;
+    sGlobalScriptContext.wildBattleScriptsArmed = FALSE;
 }
 
 bool32 Script_MatchesCallNative(const u8 *script, void *funcPtr, bool32 requestEffects)

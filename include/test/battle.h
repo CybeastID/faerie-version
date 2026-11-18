@@ -796,6 +796,8 @@ struct BattleTestData
     bool8 isShiny;
     enum Ability forcedAbilities[MAX_BATTLE_TRAINERS][PARTY_SIZE];
     const struct BreakBarConfig *breakBarConfigs[MAX_BATTLE_TRAINERS][PARTY_SIZE];
+    const struct MonEntryScript *entryScripts[MAX_BATTLE_TRAINERS][PARTY_SIZE];
+    const u8 *turnZeroScripts[MAX_BATTLE_TRAINERS];
     u8 breakBarFirstVisibleMask;
     u8 breakBarFirstVisiblePalette[MAX_BATTLERS_COUNT];
     u16 breakBarFirstVisibleColors[MAX_BATTLERS_COUNT][2];
@@ -1051,6 +1053,8 @@ void DeclareSummonedAlly(u32 sourceLine);
 #define Level(level) Level_(__LINE__, level)
 #define MaxHP(maxHP) MaxHP_(__LINE__, maxHP)
 #define BreakBars(config) BreakBars_(__LINE__, config)
+#define EntryScript(config) EntryScript_(__LINE__, config)
+#define TurnZeroScript(trainer, script) TurnZeroScript_(__LINE__, trainer, script)
 #define HP(hp) HP_(__LINE__, hp)
 #define Attack(attack) Attack_(__LINE__, attack)
 #define Defense(defense) Defense_(__LINE__, defense)
@@ -1096,6 +1100,8 @@ void Ability_(u32 sourceLine, enum Ability ability);
 void Level_(u32 sourceLine, u32 level);
 void MaxHP_(u32 sourceLine, u32 maxHP);
 void BreakBars_(u32 sourceLine, const struct BreakBarConfig *config);
+void EntryScript_(u32 sourceLine, const struct MonEntryScript *config);
+void TurnZeroScript_(u32 sourceLine, enum BattleTrainer trainer, const u8 *script);
 void HP_(u32 sourceLine, u32 hp);
 void Attack_(u32 sourceLine, u32 attack);
 void Defense_(u32 sourceLine, u32 defense);

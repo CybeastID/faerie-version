@@ -2201,6 +2201,19 @@
 	.4byte \config
 	.endm
 
+	@ config is a static TrainerBattleScripts; an empty config disables defaults.
+	.macro settrainerbattlescripts trainer:req, config:req
+	callnative Script_SetTrainerBattleScripts, requests_effects=1
+	.2byte \trainer
+	.4byte \config
+	.endm
+
+	@ config is a static WildBattleScripts consumed by the next dowildbattle.
+	.macro setwildbattlescripts config:req
+	callnative Script_SetWildBattleScripts, requests_effects=1
+	.4byte \config
+	.endm
+
 	.macro setdynamicaifunc func:req
 	callnative ScriptSetDynamicAiFunc, requests_effects=1
 	.4byte \func

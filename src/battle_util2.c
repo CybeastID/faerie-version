@@ -19,6 +19,7 @@
 #include "battle_status_icons.h"
 #include "script.h"
 #include "trainer_break_bars.h"
+#include "battle_entry_scripts.h"
 
 void AllocateBattleGfxResources(void)
 {
@@ -85,6 +86,8 @@ void FreeBattleResources(void)
 {
     TempAllyFinishBattle();
     TrainerBreakBarsClearPending();
+    BattleEntryScriptsClear();
+    Script_ClearBattleScripts();
     Script_ClearTrainerBreakBarOverrides();
     Script_ClearWildBreakBarOverride();
     if (gBattleTypeFlags & BATTLE_TYPE_TRAINER_TOWER && gMapHeader.regionMapSectionId == MAPSEC_TRAINER_TOWER_2)

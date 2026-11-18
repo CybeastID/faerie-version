@@ -2932,6 +2932,19 @@ BattleScript_FirstTurnSwitchInEvents::
 	switchinevents
 	end3
 
+@ Both payloads must return; only the opening wrapper owns a callback.
+BattleScript_ConfiguredEntry::
+	callnative BS_CallConfiguredEntryScript
+	waitstate
+	callnative BS_FinishConfiguredEntryScript
+	return
+
+BattleScript_ConfiguredTurnZero::
+	callnative BS_CallConfiguredEntryScript
+	waitstate
+	callnative BS_FinishConfiguredEntryScript
+	end3
+
 BattleScript_EndTurnEvents::
 	endturnevents
 	end

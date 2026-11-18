@@ -2497,6 +2497,7 @@ bool8 ScrCmd_dowildbattle(struct ScriptContext *ctx)
     Script_RequestEffects(SCREFF_V1 | SCREFF_HARDWARE);
 
     Script_ArmWildBreakBars(ctx);
+    Script_ArmWildBattleScripts(ctx);
 
     if (sIsScriptedWildDouble == FALSE)
         BattleSetup_StartScriptedWildBattle();

@@ -1,5 +1,65 @@
 # Upstream modification ledger
 
+## Configurable Turn 0 / On Entry scripts (2026-11-17)
+
+Implementation, ordering, TX audit and authoring/validation details:
+[entry scripts](entry_scripts.md). User verification: Entry scripts **16/16**
+after the final harness-only RECORDED/RECORDED_LINK exemption; exit HP **4/4**
+after moving new static buffers from IWRAM to EWRAM. The earlier trainer assignment
+run passed **11/11**. Real link/replay behavior is unchanged. The allocator failure
+did not recur in the focused exit-HP run; no allocator algorithm was changed.
+The user subsequently reports broader Break Bar, Koanko Zacian and Trainer Slide
+passes; More Wishes' only failure was an outdated Revivify expectation. Its test
+now asserts the existing Castoria-level revival block; the user reports the
+focused rerun passed, completing the requested automated regression batch.
+No new or changed engine hook accompanies that test correction. mGBA acceptance
+remains pending.
+
+- `battle_setup.c:CreateNPCTrainerParty` uses the dedicated scoped script adapter
+  around the existing Break Bar adapter. `CreateNPCTrainerPartyFromTrainer`
+  clears only the generated owner's hook state and records selected source
+  indices alongside mon generation. Narrow hooks; preserve original trainer ID
+  versus copied party/pool identity and pre-allocation timing on upstream merges.
+  Regressions: source rules, owner isolation, pool selection/pending handoff.
+- `battle_main.c:CB2_InitBattle/CB2_InitBattleInternal` consume scripted-wild and
+  pending-trainer pointers before entry. Configured encounters disable recording
+  because replay does not serialize configuration. Narrow initialization hooks;
+  audit party-generation/allocation order and replay support if upstream changes.
+- `battle_switch_in.c:DoSwitchInEvents` adds one stage after Mirror Herb and
+  before clearing entry flags/Eject Pack. `constants/battle_switch_in.h` names the
+  stage. Narrow scheduler hook, with a semantic dependency on living entrants,
+  established speed ordering and the existing switchIn flag. Regressions:
+  initial/repeat/once, Charm/Intimidate ordering, replacement and independent owners.
+- `battle_main.c:TryDoEventsBeforeFirstTurn` adds opening scripts after existing
+  slides/Castoria check, then an ordinary faint pass. Nonzero outcomes exit via
+  the existing end-battle table before command selection. Both opening faint
+  phases use a dedicated adapter after a configured hook has run: Gen 4+
+  replacement sees an exhausted action queue, then the real cursor is restored.
+  This prevents pre-menu KOs from deferring a replacement into turn one.
+  `battle_main.h` names the stages. Narrow hooks; preserve first-menu, action/PP
+  and faint ordering.
+  Regressions: opening once/order/PP, unconfigured openings, controller waits.
+- `scrcmd.c:ScrCmd_dowildbattle` arms a ScriptContext-owned wild handoff.
+  `script.c:InitScriptContext/StopScript` clear added override pointers;
+  `script.h` stores independent trainer overrides and the armed wild config.
+  Event macros use existing callnative encoding; no new opcode. Narrow handoff
+  hooks; audit initiating-context lifetime and cancellation. Regressions:
+  armed/unarmed wild, trainer identity consumption and script stop.
+- `battle_util2.c:FreeBattleResources` clears module context/pending configuration
+  and ScriptContext overrides. `battle.h:PartyState/BattleStruct` own per-mon
+  counts/configs and encounter opening pointers/done/running state. Graphics-only
+  teardown is unchanged. Narrow cleanup/storage additions; preserve full-resource
+  versus graphics lifetime on upstream merges. Regressions: reshow during payload,
+  cleanup, party regeneration, stack rejection and pending bar resolution.
+
+All policy, configuration and execution-context code remains in
+`battle_entry_scripts.c`; TX's summon/ambush code is unchanged. This increases
+small integration touchpoints in party creation and two event state machines,
+without replacing their algorithms. The main compatibility risk is semantic
+entry/faint/replay ordering, not the number of changed lines. Run the new
+`Entry scripts:` suite plus existing Break Bar, trainer assignment, TX More
+Wishes, Trainer Slide and Koanko/Zacian regressions before considering it verified.
+
 ## Koanko Stage 07: independent ally and singles restoration (2026-11-17)
 
 Implementation details and exact validation status:

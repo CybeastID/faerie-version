@@ -380,7 +380,7 @@ AI_SINGLE_BATTLE_TEST("Arcanum Wish More Wishes rebuilds the screen without crea
     }
 }
 
-AI_SINGLE_BATTLE_TEST("Arcanum Wish More Wishes retires its defeated slot while Castoria revives another ally")
+AI_SINGLE_BATTLE_TEST("Arcanum Wish More Wishes retires its defeated slot and keeps Castoria's Revivify blocked")
 {
     GIVEN {
         AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
@@ -410,8 +410,11 @@ AI_SINGLE_BATTLE_TEST("Arcanum Wish More Wishes retires its defeated slot while 
         EXPECT_EQ(IsBattlerAlive(3), FALSE);
         EXPECT_EQ(IsBattlerAlive(1), TRUE);
         EXPECT_EQ(gBattleOutcome, B_OUTCOME_PLAYER_TELEPORTED);
-        EXPECT_EQ(GetMonData(&gParties[B_TRAINER_OPPONENT_A][1], MON_DATA_HP), GetMonData(&gParties[B_TRAINER_OPPONENT_A][1], MON_DATA_MAX_HP));
+        EXPECT_EQ(GetMonData(&gParties[B_TRAINER_OPPONENT_A][1], MON_DATA_HP), 0);
+        EXPECT_EQ(TxRollbackBlocksCastoriaRevivify(1), TRUE);
         EXPECT_EQ(TxRollbackCanRevive(B_TRAINER_OPPONENT_A, PARTY_SIZE - 1), FALSE);
+        // An ordinary ally is still eligible for other revival sources; the
+        // separate caster-level restriction blocks Castoria's Revivify outright.
         EXPECT_EQ(TxRollbackCanRevive(B_TRAINER_OPPONENT_A, 1), TRUE);
         EXPECT_EQ(gBattleResults.opponentFaintCounter, 1);
         gBattleStruct->castoria.wishUsed = FALSE;
@@ -426,6 +429,12 @@ AI_SINGLE_BATTLE_TEST("Arcanum Wish More Wishes retires its defeated slot while 
         } command = {B_SCR_OP_CALLNATIVE, NULL, fail, fail};
         const u8 *savedScript = gBattlescriptCurrInstr;
         gBattlerAttacker = 1;
+        gSelectedMonPartyId = 1;
+        gBattlescriptCurrInstr = (const u8 *)&command;
+        BS_TryRevivalBlessing2();
+        EXPECT_EQ(gBattlescriptCurrInstr, fail);
+        EXPECT_EQ(gSelectedMonPartyId, PARTY_SIZE);
+        EXPECT_EQ(GetMonData(&gParties[B_TRAINER_OPPONENT_A][1], MON_DATA_HP), 0);
         for (u32 i = 0; i < 2; i++)
         {
             gSelectedMonPartyId = PARTY_SIZE - 1;

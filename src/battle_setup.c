@@ -62,6 +62,7 @@
 #include "fishing.h"
 #include "kazuradrop_gameover.h"
 #include "trainer_break_bars.h"
+#include "battle_entry_scripts.h"
 #include "battle_main.h"
 
 enum TransitionType
@@ -2208,6 +2209,7 @@ void CreateNPCTrainerPartyFromTrainer(struct Pokemon *party, const struct Traine
 
     ZeroPartyMons(party);
     TrainerBreakBarsBeginParty(party);
+    BattleEntryScriptsBeginParty(party);
 
     monsCount = trainer->partySize;
     if (gBattleTypeFlags & BATTLE_TYPE_TWO_OPPONENTS && (B_MULTI_HALF_TEAMS || trainer->multiTeamSize == MULTI_TEAM_SIZE_HALF))
@@ -2226,6 +2228,7 @@ void CreateNPCTrainerPartyFromTrainer(struct Pokemon *party, const struct Traine
         u32 monIndex = monIndices[i];
         GenerateMonFromTrainerMon(&party[i], &trainer->party[monIndex], trainerGen);
         TrainerBreakBarsRecordGeneratedMon(party, i, trainer->party[monIndex].species, monIndex);
+        BattleEntryScriptsRecordMon(party, i, trainer->party[monIndex].species, monIndex);
     }
     Free(trainerGen);
 }
@@ -2237,7 +2240,7 @@ static void CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum)
         rules = GetTrainerBreakBarRules(trainerNum, GetTrainerDifficultyLevel(trainerNum));
     if (!GetTrainerStructFromId(trainerNum)->overrideTrainer)
     {
-        CreateNPCTrainerPartyWithBreakBars(party, GetTrainerStructFromId(trainerNum), TRUE, gBattleTypeFlags, rules);
+        CreateNPCTrainerPartyWithScripts(party, GetTrainerStructFromId(trainerNum), trainerNum, rules);
         return;
     }
 
@@ -2250,7 +2253,7 @@ static void CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum)
     tempTrainer.poolSize = origTrainer->poolSize;
     if (tempTrainer.partySize == 0)
         tempTrainer.partySize = origTrainer->partySize;
-    CreateNPCTrainerPartyWithBreakBars(party, &tempTrainer, TRUE, gBattleTypeFlags, rules);
+    CreateNPCTrainerPartyWithScripts(party, &tempTrainer, trainerNum, rules);
 }
 
 void CreateTrainerPartyForPlayer(void)

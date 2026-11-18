@@ -99,6 +99,10 @@ one skips its activation turn. Reduction remains active after TX's defeat.
 
 ## Scripted ambush contract
 
+Generic encounter opening and mon entry payloads now have a separate
+[Turn 0 / On Entry interface](entry_scripts.md). It reuses interpreter primitives
+without changing the specialized TX lifecycle or ambush timing described here.
+
 `TxRollbackProfile.ambushScript` must point to a battle-long script subroutine.
 The payload must **return** to its wrapper; do not end an ordinary action or jump
 to an ordinary move's terminal MoveEnd script. The default payload grants the
@@ -206,7 +210,12 @@ The central engine-hook inventory and maintenance risks are in
 
 On its final red-bar faint, TX Rollback becomes permanently defeated. Its position
 cannot refill and its party entry is excluded from both Revival Blessing variants
-and revival-item execution. Other party members retain normal revival behavior.
+and revival-item execution. Other party members retain ordinary Revival Blessing
+and item eligibility. Separately, `TxRollbackBlocksCastoriaRevivify` blocks
+Castoria's Revivify for every target from summon entry onward, including after
+TX's defeat. The retired-slot regression now expects an ordinary fainted ally to
+remain at zero HP and verifies that a preselected Revivify target is rejected.
+The user reports this corrected regression passed; the gameplay restriction is unchanged.
 The other combatant continues independently; victory requires all legitimate
 enemy survivors to be defeated. Shared faint handling resolves simultaneous KOs.
 

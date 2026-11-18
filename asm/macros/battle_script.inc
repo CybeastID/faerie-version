@@ -3,8 +3,21 @@
 	.byte B_SCR_OP_ATTACKCANCELER
 	.endm
 
+	@ Count is committed before entry payload dispatch; >1 means a repeat.
+	.macro jumpifentryscriptreentry battler:req, jumpInstr:req
+	callnative BS_JumpIfEntryScriptReentry
+	.byte \battler
+	.4byte \jumpInstr
+	.endm
+
 	.macro printattackstring
 	.byte B_SCR_OP_PRINTATTACKSTRING
+	.endm
+
+	@ Select text for STRINGID_TRAINERSLIDE / returning Trainer Slide helpers.
+	.macro setentrytrainerslidemessage message:req
+	callnative BS_SetEntryTrainerSlideMessage
+	.4byte \message
 	.endm
 
 	.macro printselectionstringfromtable ptr:req

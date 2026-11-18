@@ -597,9 +597,12 @@ struct BattlerState
 };
 
 struct BreakBarConfig;
+struct MonEntryScript;
 
 struct PartyState
 {
+    const struct MonEntryScript *entryScript;
+    u8 entryScriptRuns; // Battle-owned; switching/forms retain it, regeneration clears it.
     u32 intrepidSwordBoost:1;
     u32 dauntlessShieldBoost:1;
     u32 ateBerry:1;
@@ -658,6 +661,12 @@ struct EventStates
 
 struct BattleStruct
 {
+    const u8 *turnZeroScripts[MAX_BATTLE_TRAINERS];
+    u8 turnZeroScriptsDone;
+    bool8 entryScriptRunning;
+    bool8 entryScriptHasRun;
+    bool8 openingScriptFaintPass;
+    u8 openingScriptActionCursor;
     struct ReductionData reduction;
     struct BattlerState battlerState[MAX_BATTLERS_COUNT];
     struct PartyState partyState[MAX_BATTLE_TRAINERS][PARTY_SIZE];

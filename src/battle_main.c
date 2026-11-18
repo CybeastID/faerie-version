@@ -83,6 +83,7 @@
 #include "castoria_name_theft.h"
 #include "test/battle.h"
 #include "trainer_break_bars.h"
+#include "battle_entry_scripts.h"
 #include "battle_break_bar.h"
 
 extern const struct BgTemplate gBattleBgTemplates[];
@@ -484,6 +485,7 @@ void CB2_InitBattle(void)
         MoveSaveBlocks_ResetHeap();
     AllocateBattleResources();
     InitializeWildBreakBar(0, Script_TakeWildBreakBarOverride());
+    BattleEntryScriptsInitializeWild(Script_TakeWildBattleScripts());
     AllocateBattleSpritesData();
     AllocateMonSpritesGfx();
     RecordedBattle_ClearFrontierPassFlag();
@@ -602,14 +604,19 @@ static void CB2_InitBattleInternal(void)
             CastoriaTryCreateDebugParty(gParties[B_TRAINER_OPPONENT_A], TRAINER_BATTLE_PARAM.opponentA, TRUE);
         }
     TrainerBreakBarsApplyPending();
+    BattleEntryScriptsApplyPending();
 #if TESTING
     if (gTestRunnerEnabled)
+    {
         TestRunner_Battle_InitializeBreakBars();
+        TestRunner_Battle_InitializeEntryScripts();
+    }
 #endif
     Script_ClearTrainerBreakBarOverrides();
     Script_ClearWildBreakBarOverride();
+    Script_ClearBattleScripts();
     gMain.inBattle = TRUE;
-    gSaveBlock2Ptr->frontier.disableRecordBattle = FALSE;
+    gSaveBlock2Ptr->frontier.disableRecordBattle = BattleEntryScriptsConfigured();
 
     for (i = 0; i < PARTY_SIZE; i++)
     {
@@ -3464,6 +3471,13 @@ static void TryDoEventsBeforeFirstTurn(void)
     if (gBattleControllerExecFlags)
         return;
 
+    if (gBattleOutcome != 0)
+    {
+        FinishOpeningScriptFaints();
+        gBattleMainFunc = sEndTurnFuncsTable[gBattleOutcome & 0x7F];
+        return;
+    }
+
     switch (gBattleStruct->eventState.beforeFirstTurn)
     {
     case FIRST_TURN_EVENTS_START:
@@ -3553,7 +3567,7 @@ static void TryDoEventsBeforeFirstTurn(void)
         break;
     case FIRST_TURN_FAINTED_BATTLERS:
         // Handle any Pokemon that fainted from starting hazards before transitioning to action selection
-        if (HandleFaintedMonActions())
+        if (HandleOpeningScriptFaints())
             return;
         gBattleStruct->eventState.faintedAction = 0;
         gBattleStruct->eventState.beforeFirstTurn++;
@@ -3586,6 +3600,17 @@ static void TryDoEventsBeforeFirstTurn(void)
         gBattleStruct->eventState.beforeFirstTurn++;
         break;
     }
+    case FIRST_TURN_EVENTS_CONFIGURED_SCRIPTS:
+        if (TryRunTurnZeroScript())
+            return;
+        gBattleStruct->eventState.beforeFirstTurn++;
+        break;
+    case FIRST_TURN_EVENTS_CONFIGURED_FAINTS:
+        if (gBattleStruct->entryScriptHasRun && HandleOpeningScriptFaints())
+            return;
+        gBattleStruct->eventState.faintedAction = 0;
+        gBattleStruct->eventState.beforeFirstTurn++;
+        break;
     case FIRST_TURN_EVENTS_END:
         for (enum BattlerId battler = 0; battler < MAX_BATTLERS_COUNT; battler++)
         {

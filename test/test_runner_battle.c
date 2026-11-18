@@ -2642,6 +2642,18 @@ void BreakBars_(u32 sourceLine, const struct BreakBarConfig *config)
     DATA.breakBarConfigs[DATA.battlerParty][DATA.currentPartyIndex] = config;
 }
 
+void EntryScript_(u32 sourceLine, const struct MonEntryScript *config)
+{
+    INVALID_IF(!DATA.currentMon, "EntryScript outside of a Pokemon block");
+    DATA.entryScripts[DATA.battlerParty][DATA.currentPartyIndex] = config;
+}
+
+void TurnZeroScript_(u32 sourceLine, enum BattleTrainer trainer, const u8 *script)
+{
+    INVALID_IF(trainer >= MAX_BATTLE_TRAINERS, "Invalid TurnZeroScript trainer");
+    DATA.turnZeroScripts[trainer] = script;
+}
+
 void HP_(u32 sourceLine, u32 hp)
 {
     INVALID_IF(!DATA.currentMon, "HP outside of PLAYER/OPPONENT");
@@ -4014,6 +4026,18 @@ static void Task_RecordFirstVisibleBreakBar(u8 taskId)
     }
     if (gTasks[taskId].data[0] == 0)
         DestroyTask(taskId);
+}
+
+void TestRunner_Battle_InitializeEntryScripts(void)
+{
+    for (u32 trainer = 0; trainer < MAX_BATTLE_TRAINERS; trainer++)
+    {
+        if (DATA.turnZeroScripts[trainer] != NULL)
+            gBattleStruct->turnZeroScripts[trainer] = DATA.turnZeroScripts[trainer];
+        for (u32 slot = 0; slot < PARTY_SIZE; slot++)
+            if (DATA.entryScripts[trainer][slot] != NULL)
+                gBattleStruct->partyState[trainer][slot].entryScript = DATA.entryScripts[trainer][slot];
+    }
 }
 
 void TestRunner_Battle_InitializeBreakBars(void)
