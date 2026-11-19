@@ -1,6 +1,7 @@
 #include "global.h"
 #include "malloc.h"
 #include "battle.h"
+#include "battle_sprite_scale.h"
 #include "battle_anim.h"
 #include "bg.h"
 #include "contest.h"
@@ -2358,7 +2359,7 @@ void AnimTask_HideSwapSprite(u8 taskId)
 
         src = gMonSpritesGfxPtr->spritesGfx[position];
         dest = animBg.bgTiles;
-        CpuCopy32(src, dest, MON_PIC_SIZE);
+        BattleSpriteScaleCopyMonGfx(gBattleAnimAttacker, dest, src);
         LoadBgTiles(1, animBg.bgTiles, 0x800, animBg.tilesOffset);
         if (IsContest())
         {
@@ -2478,7 +2479,7 @@ void AnimTask_TransformMon(u8 taskId)
 
         src = gMonSpritesGfxPtr->spritesGfx[position];
         dest = animBg.bgTiles;
-        CpuCopy32(src, dest, MON_PIC_SIZE);
+        BattleSpriteScaleCopyMonGfx(gBattleAnimAttacker, dest, src);
         LoadBgTiles(1, animBg.bgTiles, 0x800, animBg.tilesOffset);
         if (IsContest())
         {

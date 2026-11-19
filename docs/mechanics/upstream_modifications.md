@@ -1,5 +1,161 @@
 # Upstream modification ledger
 
+## Stage 10 production traversal observations (2026-11-18)
+
+The latest Stage 10 milestone changes only `test/battle/koanko.c` and acceptance
+documentation. Existing Turn 0 and task interfaces attach a read-only observer
+to the full production-profile traversal: trainer/inventory continuity,
+final-only payout, one conjuring transition, ally/Arceus staging and real cleanup
+checks. Test-only storage is 16 bytes of EWRAM and one ordinary task slot, freed
+at AFTER_CLEANUP; no IWRAM, new engine hook or gameplay algorithm is introduced.
+The existing fresh ordinary singles/doubles controls remain. Compilation and
+focused `Koanko acceptance` validation are pending. The user explicitly parked
+the Stage 11 TX fixture; its predicted sequence is not treated as established
+gameplay. Source lifetime/order concerns remain in the existing encounter hooks
+documented below, with no additional upstream textual integration in this step.
+
+## Stage 10/11 recorded-test finalization follow-up (2026-11-18)
+
+`battle_main.c:CB2_QuitRecordedBattle` now mirrors two normal finish steps under
+TESTING: shiny-wild news before THEN and held-item restoration/Bag transfer after
+THEN, before AFTER_CLEANUP. Earlier fixes to player-name termination and stolen
+item bookkeeping remain present; this quit route skipped their finalization
+calls. `TryRecordShinyWildBattle` factors the existing normal-finish guard into a
+static helper shared with the test route, avoiding two copies of its exclusions.
+Natural completion ordering and release recorded-playback behavior are unchanged.
+Live TX/Reduction/form state is still observed before cleanup, and resource
+freeing remains after the guarded cleanup callback. No new RAM/state is added.
+Regressions: shiny-wild adjacent TV, Gen 9+ Thief/Covet Bag transfer and all
+After Cleanup cases. User rerun pending. Preserve TV-before-THEN and
+items-before-AFTER_CLEANUP ordering when merging upstream finish/quit changes;
+these are narrow hooks with meaningful lifecycle compatibility requirements.
+
+The TX follow-up changes only controlled tests: Castoria-only Restoration,
+original-phase replay counters and Doom Desire's legitimate exact tie with
+Meteo. Roar's negative scene fixture now uses NONE_OF. Production TX policy and
+vanilla AI tests/timing limits are unchanged. `AI_GetDamageOutcome` avoids a
+duplicate opening-floor query for barless targets, using its existing
+CanEndureHit result; floor-before-layer classification remains covered by the
+Arceus acceptance cases. Current timing recovery is not claimed.
+
+## Stage 11 acceptance: implemented Arceus opening floor (2026-11-18)
+
+`battle_ai_util.c:CanEndureHit/AI_GetDamageOutcome/AI_GetReachableDamage/
+CanAIFaintTarget/CanTargetMoveFaintAi` now query the existing Koanko Arceus
+opening protection and pure HP-loss clamp. Previously the implemented floor
+could be scored as a KO, or a bar reveal despite executing before bar handling.
+Protected hits count as survival, reachable damage stops at one HP, and current
+damage cannot be extrapolated through the opening phase. Ordinary and saved
+layer handling resumes when protection ends. These are narrow read-only hooks
+at the established Break Bar AI seams, with no new state/IWRAM, phase execution
+or resource consumption. They change shared survival semantics, so upstream
+KO/helper changes require review even if textual merging is easy. Regressions:
+`Koanko AI acceptance` in the Arceus protection/adaptation tests, existing
+`Koanko AI`, `Koanko Tactics`, `Koanko` and ordinary `AI` controls. Implementation
+reviewed; current compilation/tests remain pending under user-controlled testing.
+
+After the first user run reported smart doubles at 33 frames versus a 31-frame
+ceiling, local inline gates now bypass external encounter ownership helpers for
+dormant Arceus state. The reachable-damage clamp is evaluated once before the
+`min/max` macros. This adds no state and preserves the original timing budgets;
+timing recovery remains unverified. The attempted removal of vanilla Steven
+Reflect assertions was incorrect and has been fully reversed; those tests also
+protect tagged tie-breaking. `battle_ai_main.c:ChooseMoveOrAction_Doubles` now
+publishes its TESTING-only `scoreTieCount` before the RNG draw, matching singles.
+The test RNG previously read a stale prior-target count; legal candidate filters
+can make that count differ from the current array's valid range. This narrow
+ordering correction changes no release-build selection or RAM allocation.
+Preserve metadata-before-draw ordering when upstream changes tie construction.
+Regression controls: unmodified `AI thinking time` and `TIE_BREAK_SCORE`. Current
+rerun commands and fixture corrections are in the Stage 11 acceptance ledger;
+the correction remains unverified until user-run tests.
+
+## Stage 09.1 user-reported regression corrections (2026-11-18)
+
+User review supersedes the general-overworld rollout described below. Regular
+overworld handling is the default; shrinking is explicitly scripted behind
+`FLAG_PLAYER_OVERWORLD_AFFINE` (unused 0x25). SMOL gameplay is independent.
+
+- `field_player_avatar.c:MovementType_Player`: the optional custom dispatcher
+  replaces unconditional offset/matrix writes. Regular mode leaves `x2/y2` to
+  upstream movement/field effects, addressing ledge/Acro/Fly/Surf offsets and
+  the reported Dive bobbing conflict. `object_event_graphics_info.h` restores
+  Brendan's ordinary OAM and shadow from upstream 1.17.2 (`79dd436920`). No
+  movement algorithm or per-field-effect patch is added. Tests cover all states,
+  both genders, independent SMOL state and explicit opt-in/disable cleanup.
+  Follow-up: `AdjustAffineSpriteOffset` (the separate `PlayerSetAnimId` entry
+  hook) also delegates to the guarded origin helper. Its leftover unconditional
+  (-8, -16) assignment displaced regular sprites on all startup paths; direct
+  OAM writes are removed. The movement-entry regression requires user-run tests.
+- `battle_intro.c:DrawBattlerOnBg` and
+  `battle_anim_effects_3.c:AnimTask_TransformMon/AnimTask_HideSwapSprite`: narrow copy hooks apply the
+  current base scale to existing animation-owned 4bpp tile buffers. Ordinary
+  copies, contests and Substitute retain their path; palette/scroll/mosaic
+  processing is unchanged. Keep both initial and form-reload copies when
+  merging. Pixel and actual damage/stat/Transform regressions cover these seams.
+- `kazuradrop_battle_ui.c:ShowKazuraDialogueBox/HideKazuraDialogueBox`: custom
+  asynchronous text now owns its EWRAM heap buffer until printer dismissal;
+  the former stack buffer expired before rendering. Close/teardown deactivates
+  the printer before releasing its text/window. Dedicated real-printer tests
+  cover both legendary tiers and ordinary taunts, bypassing the old headless
+  shortcut. This is custom UI repair, not a shared text engine modification.
+
+- `battle_main.c:FreeResetData_ReturnToOvOrDoEvolutions`: defer all teardown
+  until the palette fade finishes. Previously graphics and `gBattleStruct` were
+  freed during visible fade frames, forcing unscaled rendering after EXP. Both
+  evolution and direct-return branches now reach common cleanup after fading.
+  This corrects engine resource lifetime without adding persistent transforms
+  or RAM. A TESTING-only accessor exercises the production callback across fade
+  frames with ordinary, SMOL and cleaned-up Reduction fixtures. The user reports
+  focused tests passing after the bit-field assertion correction; final build
+  and visual evidence remain unrecorded. Preserve ordering when merging upstream
+  exit, special-battle and evolution changes; the guard is small and the old
+  faded branch is mechanically flattened. These are semantic compatibility
+  concerns even where textual merging is straightforward.
+
+The battle compositor also rebinds matching OBJ-window/blended silhouettes to
+the mon's already-composed output matrix/grounding (stat changes use this path,
+not a monbg copy). CPU clones and their animation lifetime remain untouched and
+no additional matrix/state buffer is allocated. It freezes an established size during an exit outcome
+instead of interpolating to the cleaned-up gameplay state. New persistent
+rendering data remains in EWRAM; the dialogue allocates 512 bytes only while
+open. Shader/background tiling and overwrite ordering are the main new semantic
+merge risks. Current run/visual retest status is recorded in
+[battle sprite scale](battle_sprite_scale.md); Computer Use is revoked.
+
+## Stage 09.1 battle scale and player-avatar origins (2026-11-18)
+
+Implementation and current evidence: [battle sprite scale](battle_sprite_scale.md).
+The user authorized this separate feature and subsequently added every other
+player-avatar origin. Stage 09 mechanics/presentation remain a separate baseline.
+
+- `battle.h:BattleStruct`: 32 bytes of battle-owned EWRAM presentation state;
+  no IWRAM allocation and no duplicate Reduction loss counter.
+- `battle_main.c:BattleMainCB2`: one render-wrapper call after sprite animation.
+  Dedicated code composes temporary OAM output, restores CPU animation state and
+  releases matrices within the same frame. The generic renderer/animation
+  algorithms are unchanged for battle shrinking. Preserve ordering on merge;
+  test real animations, flips, menu/form rebuild, resource exhaustion and exit.
+- `battle_main.c:SwitchInClearSetData`: a narrow visual-record reset alongside
+  occupant reset; prevents scale inheritance. Tests cover switching/replacement
+  and actual independent-ally ownership/formation.
+- `field_player_avatar.c:MovementType_Player`: replaces walking-only constants
+  with a dimension-derived origin helper; preserves walking's (-8, -16) values.
+  Existing movement and facing logic remain. Test all avatar states and genders.
+- `sprite.c:AddSubspritesToOamBuffer`: one conditional custom helper fixes shared
+  affine origins for priority-split pieces of the actual shrinking player.
+  Existing tile/priorities and other actors retain their path. This is broader
+  rendering integration than changing metadata alone, but necessary to keep
+  bridge/foreground pieces assembled; changes to upstream subsprite composition
+  need semantic review against the ordinary sprite and avatar regressions.
+
+The implementation stays in dedicated `battle_sprite_scale.c` and the existing
+custom `sprite_effects.c`, avoiding resets scattered across move animations or
+hand-edited origin tables. This limits textual overlap; animation/BG ownership,
+resource lifetime, visual grounding and per-piece mirroring remain the important
+semantic compatibility risks. Initial focused groups pass; broader acceptance
+and final memory/visual evidence are still being collected.
+
 ## Koanko Stage 09 entry and revised overcharge (2026-11-18)
 
 Completed adaptation integration: normal ROM build passed; all 23 Command Seal,

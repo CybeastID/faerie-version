@@ -3,6 +3,7 @@
 #include "battle_anim.h"
 #include "battle_environment.h"
 #include "battle_main.h"
+#include "battle_sprite_scale.h"
 #include "battle_setup.h"
 #include "bg.h"
 #include "gpu_regs.h"
@@ -563,7 +564,7 @@ void DrawBattlerOnBg(int bgId, u8 x, u8 y, enum BattlerPosition battlerPosition,
 {
     int i, j;
     int offset = tilesOffset;
-    CpuCopy16(gMonSpritesGfxPtr->spritesGfx[battlerPosition], tiles, BG_SCREEN_SIZE);
+    BattleSpriteScaleCopyMonGfx(GetBattlerAtPosition(battlerPosition), tiles, gMonSpritesGfxPtr->spritesGfx[battlerPosition]);
     LoadBgTiles(bgId, tiles, 0x1000, tilesOffset);
     for (i = y; i < y + 8; i++)
     {

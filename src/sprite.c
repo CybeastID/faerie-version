@@ -1,5 +1,6 @@
 #include "global.h"
 #include "sprite.h"
+#include "sprite_effects.h"
 #include "main.h"
 #include "overworld.h"
 #include "palette.h"
@@ -1887,6 +1888,8 @@ bool8 AddSubspritesToOamBuffer(struct Sprite *sprite, u8 *oamIndex)
 
             if (sprite->subspriteMode < SUBSPRITES_IGNORE_PRIORITY)
                 subspriteOam.priority = subspriteTable->subsprites[i].priority;
+
+            ApplyPlayerAffineSubspriteOrigin(sprite, &subspriteTable->subsprites[i], &subspriteOam);
 
             if (AddToOamBuffer(oamIndex, &subspriteOam, sprite->copyToObjWin))
                 return TRUE;

@@ -1,5 +1,7 @@
 #include "global.h"
 #include "test/battle.h"
+#include "battle_ai_main.h"
+#include "battle_ai_util.h"
 #include "battle_koanko.h"
 #include "battle_entry_scripts.h"
 #include "battle_script_native.h"
@@ -104,6 +106,58 @@ SINGLE_BATTLE_TEST("Koanko Arceus protection floors direct, OHKO and multihit da
         EXPECT_EQ(GetBreakBarCount(1), originalBar ? 1 : 0);
         EXPECT(KoankoArceusOpeningReady(1));
         EXPECT(KoankoArceusIsProtected(1)); // Until a successful saved-layer handoff.
+    } AFTER_CLEANUP {
+        FinishProtectionFixture();
+    }
+}
+
+SINGLE_BATTLE_TEST("Koanko AI acceptance opening protection outranks KO and layer predictions without mutation")
+{
+    u32 layer;
+    u16 hp;
+    PARAMETRIZE { layer = 0; hp = 37; }
+    PARAMETRIZE { layer = 0; hp = 1; }
+    PARAMETRIZE { layer = 1; hp = 37; }
+    PARAMETRIZE { layer = 2; hp = 37; }
+    GIVEN {
+        ProtectionFixture(0);
+        PLAYER(SPECIES_WOBBUFFET) { Level(100); Speed(10); Moves(MOVE_SEISMIC_TOSS, MOVE_CELEBRATE); }
+        OPPONENT(SPECIES_ARCEUS_NORMAL) {
+            HP(37); MaxHP(100); Speed(1); Moves(MOVE_CELEBRATE);
+            EntryScript(&gKoankoArceusProtectionEntry);
+        }
+    } WHEN {
+        TURN { MOVE(player, MOVE_CELEBRATE); MOVE(opponent, MOVE_CELEBRATE); }
+    } THEN {
+        EXPECT(KoankoArceusIsProtected(1));
+        if (layer == 1) EXPECT(ActivateBreakBar(1, &sProtectionBar));
+        if (layer == 2) EXPECT(GrantSavedBreakBar(1));
+        opponent->hp = hp;
+        SetMonData(GetBattlerMon(1), MON_DATA_HP, &hp);
+        SetAiLogicDataForTurn(gAiLogicData);
+        struct KoankoArceusState state = gBattleStruct->koankoArceus;
+        struct PartyState owner = *GetBattlerPartyState(1);
+        struct BattleGimmickData gimmick = gBattleStruct->gimmick;
+
+        EXPECT_EQ(AI_GetDamageOutcome(0, 1, MOVE_SEISMIC_TOSS, 100), AI_DAMAGE_SURVIVAL);
+        EXPECT_EQ(AI_GetDamageOutcome(0, 1, MOVE_ICICLE_SPEAR, 1000), AI_DAMAGE_SURVIVAL);
+        EXPECT_EQ(AI_GetReachableDamage(1, 1000), hp - 1);
+        EXPECT_EQ(AI_GetReachableDamage(1, -1), 0);
+        EXPECT(CanEndureHit(0, 1, MOVE_ICICLE_SPEAR));
+        EXPECT(!CanIndexMoveFaintTarget(0, 1, 0, AI_ATTACKING));
+        EXPECT(!CanAIFaintTarget(0, 1, 2));
+        EXPECT(!CanTargetMoveFaintAi(MOVE_SEISMIC_TOSS, 0, 1, 2));
+        EXPECT_EQ(opponent->hp, hp);
+        EXPECT_EQ(GetMonData(GetBattlerMon(1), MON_DATA_HP), hp);
+        EXPECT_EQ(memcmp(&state, &gBattleStruct->koankoArceus, sizeof(state)), 0);
+        EXPECT_EQ(memcmp(&owner, GetBattlerPartyState(1), sizeof(owner)), 0);
+        EXPECT_EQ(memcmp(&gimmick, &gBattleStruct->gimmick, sizeof(gimmick)), 0);
+
+        // Retiring protection reveals the existing ordinary/bar outcome.
+        KoankoArceusFinishBattle();
+        EXPECT_EQ(AI_GetReachableDamage(1, 1000), hp);
+        EXPECT_EQ(AI_GetDamageOutcome(0, 1, MOVE_SEISMIC_TOSS, 100),
+            layer == 0 ? AI_DAMAGE_KO : layer == 1 ? AI_DAMAGE_BREAK_LAYER : AI_DAMAGE_REVEAL_SAVED_LAYER);
     } AFTER_CLEANUP {
         FinishProtectionFixture();
     }

@@ -1217,10 +1217,10 @@ static struct ChosenAction ChooseMoveOrAction_Doubles(enum BattlerId battler)
                 mostViableMovesNo = 1;
                 mostViableMovesScores[0] = 0;
             }
-            actionOrMoveIndex[i] = mostViableMovesIndices[RandomUniform(RNG_AI_SCORE_TIE_DOUBLES_MOVE, 0, mostViableMovesNo - 1)];
             #if TESTING
             gBattleTestRunnerState->data.trial.scoreTieCount = mostViableMovesNo;
             #endif
+            actionOrMoveIndex[i] = mostViableMovesIndices[RandomUniform(RNG_AI_SCORE_TIE_DOUBLES_MOVE, 0, mostViableMovesNo - 1)];
             bestMovePointsForTarget[i] = mostViableMovesScores[0];
             if (!IsBattlerAlly(battler, i))
             {

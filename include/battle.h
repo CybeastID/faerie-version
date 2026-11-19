@@ -661,6 +661,7 @@ struct EventStates
 // Cleared at the beginning of the battle. Fields need to be cleared when needed manually otherwise.
 #include "battle_reduction.h"
 #include "battle_koanko.h"
+#include "battle_sprite_scale.h"
 
 struct BattleStruct
 {
@@ -671,6 +672,7 @@ struct BattleStruct
     bool8 openingScriptFaintPass;
     u8 openingScriptActionCursor;
     struct ReductionData reduction;
+    struct BattleSpriteScale spriteScale[MAX_BATTLERS_COUNT];
     struct BattlerState battlerState[MAX_BATTLERS_COUNT];
     struct PartyState partyState[MAX_BATTLE_TRAINERS][PARTY_SIZE];
     u8 koankoPhase; // enum KoankoPhase; encounter-owned, survives graphics reloads.

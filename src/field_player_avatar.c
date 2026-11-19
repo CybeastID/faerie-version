@@ -353,39 +353,9 @@ static bool8 (*const sPlayerAvatarSecretBaseMatSpin[])(struct Task *, struct Obj
 
 void MovementType_Player(struct Sprite *sprite)
 {
-    if (sprite->oam.affineMode == ST_OAM_AFFINE_DOUBLE)
-    {
-        sprite->x2 = -8;
-        sprite->y2 = -16;
-        
-        u8 dir = gObjectEvents[gPlayerAvatar.objectEventId].facingDirection;
-        struct OamMatrix *matrix = &gOamMatrices[sprite->oam.matrixNum];
-        
-        // Mirror the affine matrix horizontally for east-facing directions.
-        // The x-axis terms are 'a' and 'c' in the GBA affine matrix.
-        if (dir == DIR_EAST)
-        {
-            if (matrix->a > 0)
-                matrix->a = -matrix->a;
-            if (matrix->c > 0)
-                matrix->c = -matrix->c;
-        }
-        else
-        {
-            if (matrix->a < 0)
-                matrix->a = -matrix->a;
-            if (matrix->c < 0)
-                matrix->c = -matrix->c;
-        }
-    }
-    else
-    {
-        sprite->x2 = 0;
-        sprite->y2 = 0;
-    }
+    UpdatePlayerOverworldAffine(sprite);
     UpdateObjectEventCurrentMovement(&gObjectEvents[sprite->data[0]], sprite, (bool8 (*)(struct ObjectEvent *, struct Sprite *))ObjectEventCB2_NoMovement2);
 }
-
 static u8 ObjectEventCB2_NoMovement2(void)
 {
     return 0;
@@ -1295,13 +1265,10 @@ void PlayerSetAnimId(u8 movementActionId, enum CopyMovement copyableMovement)
 
 void AdjustAffineSpriteOffset(struct Sprite *sprite)
 {
-    // Adjust pivot point
-    sprite->x2 = -8;  // Example: Shift left by 8 pixels
-    sprite->y2 = -16; // Example: Shift up by 16 pixels
-
-    // Update OAM to apply changes
-    sprite->oam.x = sprite->x + sprite->x2;
-    sprite->oam.y = sprite->y + sprite->y2;
+    // Movement entry also reaches this function in ordinary non-affine mode.
+    // Only an opted-in affine canvas needs the origin correction. In regular
+    // mode leave jump/bob offsets untouched; BuildOamBuffer owns OAM coords.
+    ApplyPlayerSpriteAffineOrigin(sprite);
 }
 
 // slow stairs (from FRLG--faster than slow)

@@ -1,6 +1,133 @@
 # Stage 11 — Koanko AI behavior and tactical validation
 
-Status: **implemented for present mechanics; final acceptance blocked by feature dependencies** on local `mypatch`, 2026-11-10. The source audit below is the original planning snapshot; the implementation record at the end supersedes stale statements about missing Stage03/Koanko dynamic AI. Final Stage10 acceptance remains gated by the unfinished feature dependencies.
+Current status (2026-11-18): **implemented; revalidating against the completed encounter**.
+The 2026-11-10 `mypatch` audits and implementation counts below are historical
+snapshots. Stages 01-09 are implemented; old claims of missing dynamic AI,
+unsigned selection, unapproved flags or missing boss mechanics are not current
+tasks. The later all-roster policy and current source take precedence. The
+user's `koanko_stage10_11_current_handoff.md` defines the acceptance scope.
+
+## Current acceptance ledger (2026-11-18)
+
+**Latest steering:** the user parked the TX fixture investigation and explicitly
+moved to Stage 10. The current fixture expected Doom Desire but selected Wish.
+The earlier source-only 108-point tie argument did not account for the actual
+selection and is withdrawn as a verified explanation. No additional scoring
+trace or fixture retuning was applied after this direction. Preserve this as
+an unresolved fixture/coverage issue; no production AI defect or passing Meteo
+acceptance is established by that failure. Resume only if requested. Stage 10
+continues using its existing full production traversal and dedicated filter.
+The investigation notes and rerun sequence below precede this steering and are
+historical instructions until that work is explicitly resumed.
+
+Baseline: dirty `pre-s9-real`, HEAD `776e5d4e9274c7171129bf2af75e4347f9193eff`.
+Testing is user-controlled; Computer Use remains revoked. No builds/tests were
+executed during this renewed validation pass.
+
+- Implemented: production `AI_KoankoTrainer`, original-team registration,
+  conditional handling for all twelve members, shared signed scores/layer-aware
+  outcomes, TX virtual scoring and independent-ally routing. Existing tests in
+  `koanko_ai.c`, `koanko_tx_ai.c`, `koanko_forms.c`, `koanko_zacian.c` and the
+  Arceus/Dialga files remain the starting coverage, not missing implementations.
+- Actual source defect found: Arceus's implemented opening HP floor was absent
+  from shared AI survival/KO queries. `battle_ai_util.c` now consults
+  `KoankoArceusIsProtected` for survival and single/multiple-hit KO claims;
+  reachable damage uses the existing pure execution clamp. Protection takes
+  precedence over original/saved bar valuation. No phase script executes and
+  no new state or IWRAM is allocated. This correction is not yet compiled/tested.
+- New `Koanko AI acceptance` regressions exercise the real opening lifecycle
+  with 37/1 HP and no/original/saved layers, verify no phase/HP/layer/gimmick
+  mutations, and check ordinary layer valuation after protection retires.
+  Another runs the real adaptation script before fresh ordinary-AI selection,
+  checking Ghost Judgment against Psychic/Normal despite a conflicting Plate,
+  without spending a second seal or changing the party/script/gimmick state.
+  This uses a controlled kit/slot; it does not replace full-roster acceptance.
+- Strengthened `Koanko TX AI` now uses authored trainer flags and asserts real
+  Meteo animation, last move and armed owner cooldown after Reduction. The
+  former test's Meteo assertion was commented out; its older green result only
+  proved Reduction. The secure ordinary-KO fixture and injected-score cooldown
+  mechanisms retain their separate purposes. Current changes await user tests.
+- Still unverified on this snapshot: targeted AI/Tactics/TX suites, broad AI
+  and Koanko regression controls, then Stage 10 presentation/endurance/cleanup
+  acceptance. Historical 23/23 and 15/15 counts below do not certify this source.
+
+First user-run gate, from native WSL:
+
+Initial user-run findings and corrections (2026-11-18):
+
+- Adapted-Judgment selection reported zero cached effectiveness. The fixture
+  used a scripted, non-AI opponent controller: rebuilding AI data masked its
+  unobserved moves. It now uses `AI_SINGLE_BATTLE_TEST` and authored flags from
+  the beginning; the first turn is selected by real AI before the actual bar
+  adaptation. Fresh post-adaptation selection retains all state assertions.
+- TX's promised Meteo produced unmatched/flaky scene events. Phase setup had
+  lived inside a score callback; with full flags the placeholder's Celebrate
+  can be excluded before that callback runs. Turn 0 now sets the conjured phase
+  and normal No Order Change hook before any decision, and the first fixture
+  uses `AI_KoankoTrainer` directly. Replacement still registers actual solo TX
+  at party slot 1. The old second fixture's known-passing setup is retained.
+- Ordinary controls reported smart doubles at 33 frames against 31, plus two
+  Steven move expectations selecting Metal Claw instead of Reflect. The floor
+  integration now bypasses external ownership queries for dormant Arceus state;
+  `AI_GetReachableDamage` evaluates the clamp once outside `min/max` macros.
+  Timing limits are unchanged. The initial attempt to remove Reflect expectations
+  was incorrect: these vanilla fixtures also protect tagged tie-break behavior.
+  Both tests are restored exactly, including the smart fixture's original TURN
+  placement. Source inspection found `ChooseMoveOrAction_Doubles` published
+  `scoreTieCount` after calling tagged RNG. With target-specific legal candidate
+  counts, SCORE_TIE_HI therefore read a previous target's count, potentially
+  indexing outside the current tie set. The TESTING-only count now publishes
+  before the draw, matching the singles picker. Release selection is unchanged.
+  The unmodified vanilla fixtures and `TIE_BREAK_SCORE` controls must verify it.
+  Neither tie-break nor timing recovery is claimed before a user rerun.
+
+Corrections are source-reviewed but have not been built/tested by the agent.
+
+Subsequent full-stack user report (2026-11-18): no Arceus acceptance or Steven
+tie-break mismatch was reported; ten failures remained, including TX Meteo,
+two Restoration fixtures, TV/Bag finalization, two timing ceilings, the Roar
+negative-event fixture and two explicitly ignored one-pixel text cases. Detailed
+suite totals were not supplied; this is not a blanket green acceptance record.
+
+- Meteo: source review finds Doom Desire tied at 108 and therefore conserving
+  the virtual spell under the established ordinary-wins-ties rule. The scenario
+  now observes that legitimate cast, then requires Meteo while Doom Desire is
+  pending. No production scoring or balance changes were made for this fixture.
+- Restoration: user explicitly reconfirmed Castoria-only eligibility. Two old
+  self-restoration fixtures now target Castoria, retain covered-HP/ceiling
+  assertions and count forbidden original-phase replay. Ownership coverage also
+  rejects self-restoration with an actually depleted TX bar. Gameplay unchanged.
+- Recorded-test exit: restores shiny-wild news before THEN and held-item
+  transfer after THEN/before AFTER_CLEANUP. It retains live combat-state
+  assertions before stat/form cleanup. Existing TV, Thief/Covet and After Cleanup
+  regressions are the controls; see the central ledger for the narrow hooks.
+- Roar's adjacent negative events now use NONE_OF. Text-width exceptions stay
+  untouched. Vanilla timing fixtures/ceilings remain unmodified. The Stage 07
+  record already measured smart doubles at 32 frames; the current smart Steven
+  report is 27 versus 26. A redundant floor query in AI_GetDamageOutcome is now
+  avoided when CanEndureHit will perform it. Performance remains unverified.
+
+All follow-up edits above are source-reviewed but await user-run validation.
+First rerun `Koanko AI acceptance`, `Koanko TX AI`, `AI thinking time` and
+`TIE_BREAK_SCORE` before
+repeating broader gates below. No new failure is marked KNOWN_FAILING.
+
+```bash
+make -j6 check TESTS='Koanko AI'
+make -j6 check TESTS='Koanko TX AI'
+make -j6 check TESTS='Koanko Tactics'
+```
+
+Then rerun `make -j6 check TESTS='Koanko'` and `make -j6 check TESTS='AI'` for
+encounter and shared-helper controls, retaining existing Max/Dynamax known
+failures/TODOs as separate evidence. Keep current AI/Koanko/Break Bar source,
+authored trainer data and associated tests stable during validation. Any failed
+scenario is evidence to diagnose, not permission to force a move rotation or
+retune the encounter. Upstream maintenance impact: small read-only checks in
+the existing shared helper seams; future survival/phase ordering changes need
+semantic review. See the central modification ledger.
+
+## Historical planning and implementation record (2026-11-10)
 
 Subsequent user direction explicitly requires an individual conditional block for every Koanko roster member. That follow-up is implemented in `AI_KoankoTrainer`; its current strategy/condition reference is [Koanko trainer AI](../../../mechanics/koanko_trainer_ai.md). Earlier statements below about the first six receiving no custom scorer describe the preceding milestone, not the current implementation. The user also explicitly accepted retaining the shared Break Bar awareness and other shared fixes.
 

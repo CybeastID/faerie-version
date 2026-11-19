@@ -1,6 +1,86 @@
 # Stage 10 — Encounter integration, presentation and regression acceptance
 
-Status: **fully planned**; integration follows all mandatory stages. Snapshot: `mypatch`, 2026-11-09.
+Current status (2026-11-18): **integration implemented; final acceptance in progress**.
+The 2026-11-09/10 `mypatch` planning/audit below is historical. Stages 01-09 are
+implemented; Stage 09 presentation review and Stage 11 revalidation concern the
+existing mechanics, not reimplementation. The user's
+`koanko_stage10_11_current_handoff.md` and later decisions supersede old scope.
+
+## Current acceptance ledger (2026-11-18)
+
+- Working baseline: dirty `pre-s9-real`, HEAD
+  `776e5d4e9274c7171129bf2af75e4347f9193eff`; not the old `mypatch` snapshot.
+- Implemented in `test/battle/koanko.c`: one uninterrupted production-profile
+  twelve-faint traversal plus fresh ordinary singles/doubles controls. Historical
+  evidence is `.stage09_1_validation/acceptance-final.log`, 3/3 passed before
+  the subsequent fadeout and current AI corrections. The player has controlled
+  9999 stats to isolate lifecycle; this is not natural-team endurance evidence.
+- The latest documented broad run was 174/175 with one Zacian scale-fixture
+  assertion. That fixture was corrected; a current full Koanko rerun is pending.
+- Latest user direction: proceed with Stage 10 and park the overconstrained
+  Stage 11 TX fixture. Its expected Doom Desire instead produced Wish; the
+  previously proposed 108-point tie was incomplete and is not verified runtime
+  evidence. That diagnostic fixture is not a new Stage 10 prerequisite. No new
+  boss balance change or encounter redesign is required.
+- Remaining acceptance: recorded presentation review, boundary/resource/item/
+  loss/exit coverage reconciliation and full encounter endurance. Reuse the
+  existing fixtures before adding any missing cases. An ordinary battle after
+  the encounter and actual visual pacing are separate checks from headless
+  profile traversal. No current emulator evidence is claimed; Computer Use is
+  revoked and builds/tests are user-controlled.
+- Stage 09.1 is separate. User reports focused scaling tests pass; the affine
+  small overworld ledge defect is explicitly parked. It does not gate Stage 10.
+  Break Bar diamonds are canceled. Memory optimization is a later separate task.
+
+Full-stack follow-up: the user reported ten failures on 2026-11-18. Two text
+width cases are explicitly deferred. Current corrections cover Castoria-only
+Restoration fixtures (policy reconfirmed), an attempted TX sequence correction
+(subsequently disproved and parked), recorded-test TV/item finalization and
+Roar's negative scene grouping.
+Vanilla AI assertions/limits remain intact; smart doubles 32/31 was already
+documented at Stage 07 and smart Steven currently reports 27/26. All new
+corrections await focused user reruns; final acceptance remains open. Details
+and the current source review are in the Stage 11 ledger and mechanics docs.
+
+### Current Stage 10 milestone: observed production traversal
+
+`test/battle/koanko.c` now observes the existing production twelve-profile run
+without changing decisions, scores, kits or encounter scripts. A Turn 0 native
+initializes a money canary and a single observation task. Six original opponents
+still switch freely; the production conjured team, scripts and independent ally
+remain unchanged. The observer checks trainer identity, two stocked Max Revives
+and three Ethers across the battle, no outcome/payment before twelve genuine
+faints, exactly one conjuring transition and one positive final payout. Its
+bookkeeping allows the approved payout amount rather than normalizing it for
+the temporary doubles formation.
+
+It also records actual ally arrival, opening Bug Space, crush-only mode and
+consumed-seal adaptation. THEN inspects genuine victory, restored Arceus species
+and removed owned field; AFTER_CLEANUP checks cleared Reduction/TX/ally state,
+empty partner storage and retained inventory. The observation task is destroyed
+there before battle resources are freed. All added state is test-only EWRAM
+(16 bytes plus one existing task slot); no production hooks or IWRAM are added.
+
+Source review and whitespace checks pass; the extended fixture is uncompiled
+and untested. Run in native WSL:
+
+```bash
+make -j6 check TESTS='Koanko acceptance'
+```
+
+Keep `test/battle/koanko.c` and current encounter/cleanup sources stable during
+validation. This prefix selects three groups (production traversal and fresh
+ordinary singles/doubles controls). Do not certify success until actual nonzero
+results are supplied. The broader `Koanko` filter still includes the explicitly
+parked TX fixture and is not the focused Stage 10 command for this milestone.
+
+Remaining manual acceptance: the complete encounter's graphics/pacing, actual
+item use/revival and EXP, final reward, and ordinary singles/doubles after leaving
+the encounter. The controlled MAX_LEVEL player in this automated traversal
+cannot certify EXP award or natural-team endurance. No computer-use or test-run
+authorization is inferred. Memory optimization remains separate.
+
+## Historical planning record (2026-11-09/10)
 
 Dependency update: 2026-11-10. [Stage11 AI behavior and tactical validation](11_koanko_ai_validation.md) is required before this stage's final acceptance, despite its later document number.
 

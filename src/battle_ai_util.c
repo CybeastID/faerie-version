@@ -9,6 +9,7 @@
 #include "battle_util.h"
 #include "battle_ai_main.h"
 #include "battle_break_bar.h"
+#include "battle_koanko.h"
 #include "battle_gimmick.h"
 #include "battle_stat_change.h"
 #include "battle_controllers.h"
@@ -1497,9 +1498,21 @@ static bool32 DragonDartsHitsBothTargets(u32 battlerAtk, u32 battlerDef, u32 mov
     return FALSE;
 }
 
+// Ordinary AI calls these queries frequently. Avoid entering the encounter
+// ownership helpers at all while no Koanko Arceus state exists.
+static inline bool32 HasKoankoArceusState(void)
+{
+    return gBattleStruct != NULL && gBattleStruct->koankoArceus.phase != KOANKO_ARCEUS_DORMANT;
+}
+
+static inline bool32 HasKoankoArceusProtection(u32 battler)
+{
+    return HasKoankoArceusState() && KoankoArceusIsProtected(battler);
+}
+
 bool32 CanEndureHit(enum BattlerId battler, enum BattlerId battlerTarget, enum Move move)
 {
-    if (CanInterceptBreakBar(battlerTarget))
+    if (HasKoankoArceusProtection(battlerTarget) || CanInterceptBreakBar(battlerTarget))
         return TRUE;
     if (!AI_BattlerAtMaxHp(battlerTarget) || IsMultiHitMove(move))
         return FALSE;
@@ -1529,6 +1542,8 @@ bool32 CanEndureHit(enum BattlerId battler, enum BattlerId battlerTarget, enum M
 
 u32 AI_GetReachableDamage(u32 target, s32 damage)
 {
+    if (HasKoankoArceusState())
+        damage = KoankoArceusClampHpLoss(target, damage);
     return min(max(0, damage), gBattleMons[target].hp);
 }
 
@@ -1538,10 +1553,15 @@ enum AiDamageOutcome AI_GetDamageOutcome(u32 attacker, u32 target, u32 move, s32
         return AI_DAMAGE_ORDINARY;
     if (CanInterceptBreakBar(target))
     {
+        // The opening floor runs before any original/saved bar can break.
+        if (HasKoankoArceusProtection(target))
+            return AI_DAMAGE_SURVIVAL;
         const struct PartyState *owner = GetBattlerPartyState(target);
         return owner->breakBarSavedMaxHp[owner->breakBarsRemaining - 1] != 0
             ? AI_DAMAGE_REVEAL_SAVED_LAYER : AI_DAMAGE_BREAK_LAYER;
     }
+    // Without a bar, CanEndureHit already checks the floor. Avoid a duplicate
+    // encounter query in the ordinary AI/Tera hot path.
     return CanEndureHit(attacker, target, move) ? AI_DAMAGE_SURVIVAL : AI_DAMAGE_KO;
 }
 
@@ -1721,8 +1741,8 @@ u32 GetBestDmgFromBattler(enum BattlerId battler, enum BattlerId battlerTarget, 
 // If numHits > 1, check if the target will be KO'ed by that number of hits (ignoring healing effects)
 bool32 CanAIFaintTarget(enum BattlerId battlerAtk, enum BattlerId battlerDef, u32 numHits)
 {
-    // Do not extrapolate current-form damage through an unexecuted layer script.
-    if (CanInterceptBreakBar(battlerDef))
+    // Do not extrapolate through an opening floor or an unexecuted layer script.
+    if (HasKoankoArceusProtection(battlerDef) || CanInterceptBreakBar(battlerDef))
         return FALSE;
     struct AiLogicData *aiData = gAiLogicData;
     s32 dmg;
@@ -1774,7 +1794,7 @@ bool32 CanBattlerKOTargetIgnoringSturdy(enum BattlerId battlerAtk, enum BattlerI
 
 bool32 CanTargetMoveFaintAi(enum Move move, enum BattlerId battlerDef, enum BattlerId battlerAtk, u32 nHits)
 {
-    if (CanInterceptBreakBar(battlerAtk))
+    if (HasKoankoArceusProtection(battlerAtk) || CanInterceptBreakBar(battlerAtk))
         return FALSE;
     u32 indexSlot = GetMoveSlot(GetMovesArray(battlerDef), move);
     if (indexSlot < MAX_MON_MOVES)

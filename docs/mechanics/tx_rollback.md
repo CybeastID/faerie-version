@@ -152,8 +152,10 @@ spends Castoria's allowance, and each effect can be reused when eligible.
   player occupants without an existing count. Switching clears it normally;
   replacements are not automatically affected. Enemy occupants are never affected,
   and TX's defeat does not cancel player countdowns.
-- **Restoration:** restores one depleted extra layer on either original active,
-  living ally, up to that owner's historical highest layer count and engine cap.
+- **Restoration:** restores one depleted extra layer on the original active,
+  living Castoria, up to that owner's historical highest layer count and engine cap.
+  Summoned TX cannot restore its own bars. The user reconfirmed this restriction
+  on 2026-11-18; the caster-only implementation dates to `38a56e24c2`.
   It creates a saved full layer; breaking it reveals covered HP without phase
   replay. Pending transitions, replacements, reserves and genuine faints fail.
 - **Reciprocity:** activates once until TX's genuine defeat, surviving breaks.
@@ -176,6 +178,24 @@ The summoned profile retains Restoration and excludes selectable Reduction.
 The arrival Endurance, phase Reduction and ordinary phase Wish are separate from
 the five selectable outcomes of each profile. Reciprocity resolves the current
 owner by side/party identity rather than assuming opponent-right.
+
+### Stage 10/11 full-suite follow-up (2026-11-18)
+
+The full user-run stack reported two Restoration failures from old fixtures
+targeting TX itself. Their setup and recipients now use Castoria's configured
+two-bar history and 123 covered HP. Saved-layer coverage still verifies exact
+covered HP, historical ceiling and a native original-phase callback counter
+remaining zero; an additional eligibility assertion rejects a depleted TX layer.
+The counter is TESTING fixture EWRAM, not new production/IWRAM state. Production
+Restoration eligibility is unchanged. These retargeted fixtures await user tests.
+
+The production Koanko AI fixture's immediate-Meteo expectation remains
+unresolved. A proposed source-only 108-point Doom Desire/Meteo tie did not
+predict the next user run, which selected Wish. The resulting fixed-sequence
+fixture is not accepted evidence of tactical behavior. The user explicitly
+parked this investigation and moved to Stage 10; no subsequent scorer or
+fixture changes were applied. Ordinary moves winning equal virtual scores
+remains the implemented policy, but does not by itself explain this scenario.
 
 ## Battle-only health layer and execution order
 

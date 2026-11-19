@@ -62,6 +62,29 @@ static u8 sRecipient;
 static u8 sStealCount;
 static u32 sSeedHp;
 static u16 sRecoveryHp;
+static EWRAM_DATA u8 sRestorationPhaseCalls = 0;
+
+static void BS_CountRestorationOriginalPhase(void)
+{
+    NATIVE_ARGS();
+    sRestorationPhaseCalls++;
+    gBattlescriptCurrInstr = cmd->nextInstr;
+}
+
+static const struct __attribute__((packed))
+{
+    u8 callnative;
+    void (*func)(void);
+    u8 ret;
+} sRestorationPhaseScript = {B_SCR_OP_CALLNATIVE, BS_CountRestorationOriginalPhase, B_SCR_OP_RETURN};
+
+static const struct BreakBarConfig sRestorationCasterBars = {
+    .extraBars = 2,
+    .phases = {
+        [0] = {.afterBreakScript = (const u8 *)&sRestorationPhaseScript},
+        [1] = {.afterBreakScript = (const u8 *)&sRestorationPhaseScript},
+    },
+};
 
 
 enum
@@ -114,8 +137,10 @@ static void BS_SeedTxWish(void)
     }
     if (sSeed == SEED_RESTORE)
     {
-        GetBattlerPartyState(tx)->breakBarsRemaining = 1;
-        SetTxHp(123);
+        u32 caster = gBattleStruct->txRollback.caster;
+        GetBattlerPartyState(caster)->breakBarsRemaining = 1;
+        gBattleMons[caster].hp = 123;
+        SetMonData(GetBattlerMon(caster), MON_DATA_HP, &gBattleMons[caster].hp);
     }
     if (sSeed == SEED_PLAYER_BAR)
         GrantSavedBreakBar(p);
@@ -190,7 +215,8 @@ static void TxWishFixture(u32 wish, u32 seed)
     sTie = FALSE;
     sWish = wish;
     sSeed = seed;
-    sRecipient = B_POSITION_OPPONENT_RIGHT;
+    sRecipient = seed == SEED_RESTORE ? B_POSITION_OPPONENT_LEFT : B_POSITION_OPPONENT_RIGHT;
+    sRestorationPhaseCalls = 0;
     sStealCount = 0;
     sSeedHp = 0;
     sRecoveryHp = 100;
@@ -426,7 +452,7 @@ AI_SINGLE_BATTLE_TEST("TX Wishes Restoration preserves the covered HP and histor
         AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
         TxWishFixture(TX_WISH_RESTORATION, SEED_RESTORE);
         PLAYER(SPECIES_WOBBUFFET) { Speed(1); Moves(MOVE_CELEBRATE); }
-        OPPONENT(SPECIES_CASTORIA) { Speed(100); Moves(MOVE_CELEBRATE); }
+        OPPONENT(SPECIES_CASTORIA) { Speed(100); HP(400); MaxHP(400); Moves(MOVE_CELEBRATE); BreakBars(&sRestorationCasterBars); }
         OPPONENT(SPECIES_WOBBUFFET) { Speed(1); HP(0); }
         OPPONENT(SPECIES_WOBBUFFET) { Speed(1); HP(0); }
         OPPONENT(SPECIES_WOBBUFFET) { Speed(1); HP(0); }
@@ -438,11 +464,11 @@ AI_SINGLE_BATTLE_TEST("TX Wishes Restoration preserves the covered HP and histor
     } SCENE {
         MESSAGE("A wish for Restoration restored an exhausted bar!");
     } THEN {
-        EXPECT_EQ(GetBreakBarCount(3), 2);
-        EXPECT_EQ(gBattleMons[3].hp, 400);
-        EXPECT_EQ(GetBattlerPartyState(3)->breakBarSavedHp[1], 123);
-        EXPECT_EQ((u32)GetBattlerPartyState(3)->breakBarsPeak, 2);
-        EXPECT_EQ(TxRollbackCanWishFor(3, TX_WISH_RESTORATION, 3), FALSE);
+        EXPECT_EQ(GetBreakBarCount(1), 2);
+        EXPECT_EQ(gBattleMons[1].hp, 400);
+        EXPECT_EQ(GetBattlerPartyState(1)->breakBarSavedHp[1], 123);
+        EXPECT_EQ((u32)GetBattlerPartyState(1)->breakBarsPeak, 2);
+        EXPECT_EQ(TxRollbackCanWishFor(3, TX_WISH_RESTORATION, 1), FALSE);
     }
 }
 
@@ -662,7 +688,7 @@ AI_SINGLE_BATTLE_TEST("TX Wishes Restoration saved layers do not replay original
         AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
         TxWishFixture(TX_WISH_RESTORATION, SEED_RESTORE);
         PLAYER(SPECIES_ARTICUNO) { Level(100); Speed(1000); Moves(MOVE_CELEBRATE, MOVE_SHEER_COLD); }
-        OPPONENT(SPECIES_CASTORIA) { Level(50); Speed(100); Moves(MOVE_CELEBRATE); }
+        OPPONENT(SPECIES_CASTORIA) { Level(50); Speed(100); HP(400); MaxHP(400); Moves(MOVE_CELEBRATE); BreakBars(&sRestorationCasterBars); }
         OPPONENT(SPECIES_WOBBUFFET) { Speed(1); HP(0); }
         OPPONENT(SPECIES_WOBBUFFET) { Speed(1); HP(0); }
         OPPONENT(SPECIES_WOBBUFFET) { Speed(1); HP(0); }
@@ -671,16 +697,16 @@ AI_SINGLE_BATTLE_TEST("TX Wishes Restoration saved layers do not replay original
         TURN { MOVE(player, MOVE_CELEBRATE); }
         SUMMONED_OPPONENT();
         TURN { MOVE(player, MOVE_CELEBRATE); }
-        TURN { MOVE(player, MOVE_SHEER_COLD, target: &gBattleMons[3]); }
+        TURN { MOVE(player, MOVE_SHEER_COLD, target: opponent); }
         TURN { MOVE(player, MOVE_CELEBRATE); }
     } SCENE {
         MESSAGE("A wish for Restoration restored an exhausted bar!");
         ANIMATION(ANIM_TYPE_MOVE, MOVE_SHEER_COLD, player);
-        NOT ANIMATION(ANIM_TYPE_MOVE, MOVE_WISH, &gBattleMons[3]);
         MESSAGE("A wish for Restoration restored an exhausted bar!");
     } THEN {
-        EXPECT_EQ(GetBreakBarCount(3), 2);
-        EXPECT_EQ(GetBattlerPartyState(3)->breakBarSavedHp[1], 123);
+        EXPECT_EQ(sRestorationPhaseCalls, 0);
+        EXPECT_EQ(GetBreakBarCount(1), 2);
+        EXPECT_EQ(GetBattlerPartyState(1)->breakBarSavedHp[1], 123);
         EXPECT_EQ(gBattleStruct->txRollback.health.percent, 100);
     }
 }
@@ -805,6 +831,12 @@ AI_SINGLE_BATTLE_TEST("TX Wishes ownership and Restoration eligibility reject re
     } WHEN {
         TURN { MOVE(player, MOVE_CELEBRATE); }
     } THEN {
+        // Even a depleted original TX layer is not an eligible recipient.
+        u32 txBars = GetBreakBarCount(3);
+        EXPECT_GT(txBars, 0);
+        GetBattlerPartyState(3)->breakBarsRemaining--;
+        EXPECT_EQ(TxRollbackCanWishFor(3, TX_WISH_RESTORATION, 3), FALSE);
+        GetBattlerPartyState(3)->breakBarsRemaining = txBars;
         EXPECT_EQ(TxRollbackCanWishFor(3, TX_WISH_RESTORATION, 1), FALSE);
         EXPECT_EQ(GrantSavedBreakBar(1), TRUE);
         GetBattlerPartyState(1)->breakBarsRemaining = 0;

@@ -111,8 +111,10 @@ SINGLE_BATTLE_TEST("Roar of Eternity follows Roar of Time recharge rules on miss
         TURN { MOVE(player, move, hit: failure != 0); MOVE(opponent, failure == 1 ? MOVE_PROTECT : MOVE_CELEBRATE); }
         TURN { MOVE(player, MOVE_TACKLE); MOVE(opponent, MOVE_CELEBRATE); }
     } SCENE {
-        NOT HP_BAR(opponent);
-        NOT MESSAGE("Dialga must recharge!");
+        NONE_OF {
+            HP_BAR(opponent);
+            MESSAGE("Dialga must recharge!");
+        }
         ANIMATION(ANIM_TYPE_MOVE, MOVE_TACKLE, player);
         HP_BAR(opponent);
     } THEN {

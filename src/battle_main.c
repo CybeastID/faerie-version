@@ -132,6 +132,7 @@ static void HandleEndTurn_BattleLost(void);
 static void HandleEndTurn_RanFromBattle(void);
 static void HandleEndTurn_MonFled(void);
 static void HandleEndTurn_FinishBattle(void);
+static void TryRecordShinyWildBattle(void);
 
 EWRAM_DATA u16 gBattle_BG0_X = 0;
 EWRAM_DATA u16 gBattle_BG0_Y = 0;
@@ -1759,7 +1760,7 @@ static void CB2_HandleStartMultiBattle(void)
 void BattleMainCB2(void)
 {
     AnimateSprites();
-    BuildOamBuffer();
+    BattleSpriteScaleBuildOamBuffer();
     RunTextPrinters();
     UpdatePaletteFade();
     RunTasks();
@@ -1809,8 +1810,14 @@ void CB2_QuitRecordedBattle(void)
 
             // Inspect live combat state before cleanup; AFTER_CLEANUP has its
             // own guarded dispatch below, matching the preserved harness contract.
+#if TESTING
+            TryRecordShinyWildBattle();
+#endif
             TestRunner_Battle_AfterLastTurn();
 #if TESTING
+            // Match normal completion: stolen-item bookkeeping is after THEN
+            // and before AFTER_CLEANUP, independently of stat restoration.
+            TryRestoreHeldItems();
             if (TestRunner_Battle_HasPendingAfterCleanup())
             {
                 Test_RestorePlayerBattleStats();
@@ -2995,6 +3002,7 @@ void SwitchInClearSetData(enum BattlerId battler, struct Volatiles *volatilesCop
     ClearSetDataOnLeave(battler);
 
     ReductionResetOccupant(battler);
+    BattleSpriteScaleReset(battler);
     gBattleStruct->battlerState[battler].noOrderChange = FALSE;
     ClearIllusionMon(battler);
     if (effect != EFFECT_BATON_PASS)
@@ -5456,6 +5464,22 @@ static void RestorePlayerBreakBarHp(void)
     }
 }
 
+static void TryRecordShinyWildBattle(void)
+{
+    if (!(gBattleTypeFlags & (BATTLE_TYPE_LINK
+                              | BATTLE_TYPE_RECORDED_LINK
+                              | BATTLE_TYPE_TRAINER
+                              | BATTLE_TYPE_FIRST_BATTLE
+                              | BATTLE_TYPE_SAFARI
+                              | BATTLE_TYPE_FRONTIER
+                              | BATTLE_TYPE_EREADER_TRAINER
+                              | BATTLE_TYPE_CATCH_TUTORIAL))
+        && gBattleResults.shinyWildMon)
+    {
+        TryPutBreakingNewsOnAir();
+    }
+}
+
 static void HandleEndTurn_FinishBattle(void)
 {
     if (gCurrentActionFuncId == B_ACTION_TRY_FINISH || gCurrentActionFuncId == B_ACTION_FINISHED)
@@ -5513,18 +5537,7 @@ static void HandleEndTurn_FinishBattle(void)
             }
         }
 
-        if (!(gBattleTypeFlags & (BATTLE_TYPE_LINK
-                                  | BATTLE_TYPE_RECORDED_LINK
-                                  | BATTLE_TYPE_TRAINER
-                                  | BATTLE_TYPE_FIRST_BATTLE
-                                  | BATTLE_TYPE_SAFARI
-                                  | BATTLE_TYPE_FRONTIER
-                                  | BATTLE_TYPE_EREADER_TRAINER
-                                  | BATTLE_TYPE_CATCH_TUTORIAL))
-            && gBattleResults.shinyWildMon)
-        {
-            TryPutBreakingNewsOnAir();
-        }
+        TryRecordShinyWildBattle();
 
         RecordedBattle_SetPlaybackFinished();
         if (gTestRunnerEnabled)
@@ -5576,42 +5589,44 @@ void Test_RestorePlayerBattleStats(void)
 
 static void FreeResetData_ReturnToOvOrDoEvolutions(void)
 {
-    if (!gPaletteFade.active)
-    {
-        memset(&gBattleMons, 0, sizeof(struct BattlePokemon) * MAX_BATTLERS_COUNT);
-        gIsFishingEncounter = FALSE;
-        gIsSurfingEncounter = FALSE;
-        if (gDexNavSpecies && (gBattleOutcome == B_OUTCOME_WON || gBattleOutcome == B_OUTCOME_CAUGHT))
-        {
-            IncrementDexNavChain();
-            TryIncrementSpeciesSearchLevel();
-        }
-        else
-            gSaveBlock3Ptr->dexNavChain = 0;
+    // BattleMainCB2 still renders during fadeout. Keep its sprite graphics and
+    // battle-owned presentation state alive until the screen is fully faded.
+    if (gPaletteFade.active)
+        return;
 
-        ClearCurrentTrainerWantRematchVsSeeker();
-        gDexNavSpecies = SPECIES_NONE;
-        ResetSpriteData();
-        if (!(gBattleTypeFlags & (BATTLE_TYPE_LINK
-                                  | BATTLE_TYPE_RECORDED_LINK
-                                  | BATTLE_TYPE_FIRST_BATTLE
-                                  | BATTLE_TYPE_SAFARI
-                                  | BATTLE_TYPE_FRONTIER
-                                  | BATTLE_TYPE_EREADER_TRAINER
-                                  | BATTLE_TYPE_CATCH_TUTORIAL))
-            && (B_EVOLUTION_AFTER_WHITEOUT >= GEN_6
-                || gBattleOutcome == B_OUTCOME_WON
-                || gBattleOutcome == B_OUTCOME_CAUGHT))
-        {
-            gBattleMainFunc = TryEvolvePokemon;
-        }
-        else
-        {
-            gBattleMainFunc = ReturnFromBattleToOverworld;
-            return;
-        }
+    memset(&gBattleMons, 0, sizeof(struct BattlePokemon) * MAX_BATTLERS_COUNT);
+    gIsFishingEncounter = FALSE;
+    gIsSurfingEncounter = FALSE;
+    if (gDexNavSpecies && (gBattleOutcome == B_OUTCOME_WON || gBattleOutcome == B_OUTCOME_CAUGHT))
+    {
+        IncrementDexNavChain();
+        TryIncrementSpeciesSearchLevel();
+    }
+    else
+        gSaveBlock3Ptr->dexNavChain = 0;
+
+    ClearCurrentTrainerWantRematchVsSeeker();
+    gDexNavSpecies = SPECIES_NONE;
+    ResetSpriteData();
+    if (!(gBattleTypeFlags & (BATTLE_TYPE_LINK
+                              | BATTLE_TYPE_RECORDED_LINK
+                              | BATTLE_TYPE_FIRST_BATTLE
+                              | BATTLE_TYPE_SAFARI
+                              | BATTLE_TYPE_FRONTIER
+                              | BATTLE_TYPE_EREADER_TRAINER
+                              | BATTLE_TYPE_CATCH_TUTORIAL))
+        && (B_EVOLUTION_AFTER_WHITEOUT >= GEN_6
+            || gBattleOutcome == B_OUTCOME_WON
+            || gBattleOutcome == B_OUTCOME_CAUGHT))
+    {
+        gBattleMainFunc = TryEvolvePokemon;
+    }
+    else
+    {
+        gBattleMainFunc = ReturnFromBattleToOverworld;
     }
 
+    // Both evolution and direct-return paths release resources after fading.
     FreeAllWindowBuffers();
     if (!(gBattleTypeFlags & BATTLE_TYPE_LINK))
     {
@@ -5627,6 +5642,14 @@ static void FreeResetData_ReturnToOvOrDoEvolutions(void)
         FreeBattleSpritesData();
     }
 }
+
+#if TESTING
+// Exercise the real exit callback while its palette fade is still active.
+void Test_Battle_ExitCleanupFrame(void)
+{
+    FreeResetData_ReturnToOvOrDoEvolutions();
+}
+#endif
 
 static void TryEvolvePokemon(void)
 {

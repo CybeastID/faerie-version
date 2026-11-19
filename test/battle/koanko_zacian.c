@@ -11,6 +11,8 @@
 #include "battle_interface.h"
 #include "battle_anim.h"
 #include "battle_reduction.h"
+#include "battle_sprite_scale.h"
+#include "event_data.h"
 #include "battle_util.h"
 #include "sprite.h"
 #include "malloc.h"
@@ -444,6 +446,26 @@ AI_SINGLE_BATTLE_TEST("Koanko Zacian arrives beside the player right after Etern
         // The real player party is untouched.
         EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_SPECIES), SPECIES_WOBBUFFET);
         EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][1], MON_DATA_SPECIES), SPECIES_NONE);
+        // A visually small player does not make the independently owned
+        // partner small. Rendering also preserves the asymmetric formation.
+        bool32 wasSmol = FlagGet(FLAG_PLAYER_SMOL);
+        u32 oldOutcome = gBattleOutcome;
+        // The recorded fixture has already teleported out for THEN. Exercise
+        // an in-battle flag change rather than the intentional exit-size freeze.
+        gBattleOutcome = 0;
+        FlagSet(FLAG_PLAYER_SMOL);
+        u32 playerScale = BattleSpriteScaleTarget(0);
+        u32 allyScale = BattleSpriteScaleTarget(2);
+        for (u32 frame = 0; frame < 64; frame++) BattleSpriteScaleBuildOamBuffer();
+        u32 renderedPlayerScale = BattleSpriteScaleCurrent(0);
+        u32 renderedAllyScale = BattleSpriteScaleCurrent(2);
+        if (!wasSmol) FlagClear(FLAG_PLAYER_SMOL);
+        gBattleOutcome = oldOutcome;
+        EXPECT_EQ(playerScale, BATTLE_SPRITE_SCALE_SMOL);
+        EXPECT_EQ(allyScale, BATTLE_SPRITE_SCALE_ONE);
+        EXPECT_EQ(renderedPlayerScale, BATTLE_SPRITE_SCALE_SMOL);
+        EXPECT_EQ(renderedAllyScale, BATTLE_SPRITE_SCALE_ONE);
+        EXPECT(OpponentHasCenteredLayout());
     }
 }
 

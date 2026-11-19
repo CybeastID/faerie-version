@@ -1,5 +1,6 @@
 #include "global.h"
 #include "test/battle.h"
+#include "battle_ai_main.h"
 #include "battle_ai_util.h"
 #include "battle_gfx_sfx_util.h"
 #include "battle_gimmick.h"
@@ -358,6 +359,59 @@ SINGLE_BATTLE_TEST("Koanko Command Seal Judgment runtime and AI typing use the c
         EXPECT_GT(damage.minimum, 0);
         EXPECT_EQ(opponent->item, ITEM_FIST_PLATE);
         EXPECT_EQ(opponent->hp, 37);
+    }
+}
+
+AI_SINGLE_BATTLE_TEST("Koanko AI acceptance fresh selection uses adapted Judgment and preserves the consumed seal")
+{
+    GIVEN {
+        AI_FLAGS(GetTrainerAIFlagsFromId(TRAINER_KOANKO));
+        AdaptFixture(0);
+        PLAYER(SPECIES_WOBBUFFET) { Level(100); HP(1000); MaxHP(1000); Speed(10); Moves(MOVE_SEISMIC_TOSS); }
+        OPPONENT(SPECIES_ARCEUS_NORMAL) {
+            HP(100); MaxHP(100); Speed(1); Moves(MOVE_CELEBRATE, MOVE_JUDGMENT, MOVE_ICE_BEAM, MOVE_RECOVER);
+            EntryScript(&gKoankoArceusProtectionEntry);
+        }
+    } WHEN {
+        TURN { MOVE(player, MOVE_SEISMIC_TOSS); }
+    } THEN {
+        ExpectAdapted(TYPE_FIGHTING, SPECIES_ARCEUS_GHOST, 37, 0);
+        // Exercise fresh ordinary-AI decisions after the real adaptation script.
+        // The full production roster traversal separately covers slot ownership.
+        opponent->moves[0] = MOVE_EARTH_POWER;
+        opponent->pp[0] = GetMovePP(MOVE_EARTH_POWER);
+        opponent->hp = opponent->maxHP;
+        SetMonData(GetBattlerMon(1), MON_DATA_HP, &opponent->hp);
+        u16 plate = ITEM_FIST_PLATE; // Conflicts with the charged Ghost form.
+        opponent->item = plate;
+        SetMonData(GetBattlerMon(1), MON_DATA_HELD_ITEM, &plate);
+        gAiThinkingStruct->aiFlags[1] = GetTrainerAIFlagsFromId(TRAINER_KOANKO);
+        SetDynamicAiFunc(AI_KoankoTrainer);
+        struct BattlePokemon before = *opponent;
+        struct Pokemon party = *GetBattlerMon(1);
+        struct KoankoArceusState seal = gBattleStruct->koankoArceus;
+        struct BattleGimmickData gimmick = gBattleStruct->gimmick;
+        const u8 *script = gBattlescriptCurrInstr;
+
+        for (u32 normal = 0; normal < 2; normal++)
+        {
+            player->types[0] = player->types[1] = normal ? TYPE_NORMAL : TYPE_PSYCHIC;
+            SetAiLogicDataForTurn(gAiLogicData);
+            BattleAI_SetupAIData(0xF, 1);
+            u32 slot = BattleAI_ChooseMoveIndex(1);
+            EXPECT_LT(slot, MAX_MON_MOVES);
+            EXPECT_EQ(gAiLogicData->effectiveness[1][0][1], normal ? UQ_4_12(0.0) : UQ_4_12(2.0));
+            if (normal)
+                EXPECT(opponent->moves[slot] == MOVE_EARTH_POWER || opponent->moves[slot] == MOVE_ICE_BEAM);
+            else
+                EXPECT_EQ(opponent->moves[slot], MOVE_JUDGMENT);
+            EXPECT_EQ(memcmp(&before, opponent, sizeof(before)), 0);
+            EXPECT_EQ(memcmp(&party, GetBattlerMon(1), sizeof(party)), 0);
+            EXPECT_EQ(memcmp(&seal, &gBattleStruct->koankoArceus, sizeof(seal)), 0);
+            EXPECT_EQ(memcmp(&gimmick, &gBattleStruct->gimmick, sizeof(gimmick)), 0);
+            EXPECT(gBattlescriptCurrInstr == script);
+            EXPECT_EQ(GetBreakBarCount(1), 0);
+        }
     }
 }
 

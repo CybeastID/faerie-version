@@ -51,6 +51,7 @@
 
 #include "constants/flags_frlg.h"
 #define FLAG_PLAYER_SMOL                  FLAG_0x020
+#define FLAG_PLAYER_OVERWORLD_AFFINE      FLAG_0x025
 #define FLAG_KAZURADROP_ENTERED_BATTLE   FLAG_0x022
 #define FLAG_GUTS_SNAP                   FLAG_0x024
 
@@ -61,7 +62,7 @@
 #define FLAG_KAZURADROP_ENTERED_BATTLE  0x22 // Used to check for alt GameOver.
 #define B_FLAG_TERA_ORB_CHARGED    0x23 // Unused Flag
 #define FLAG_GUTS_SNAP    0x24 // Unused Flag
-#define FLAG_UNUSED_0x025    0x25 // Unused Flag
+#define FLAG_PLAYER_OVERWORLD_AFFINE 0x25 // Explicit scripted opt-in; independent of PLAYER_SMOL gameplay.
 #define FLAG_UNUSED_0x026    0x26 // Unused Flag
 #define FLAG_UNUSED_0x027    0x27 // Unused Flag
 #define FLAG_UNUSED_0x028    0x28 // Unused Flag

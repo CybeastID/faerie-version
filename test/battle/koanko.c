@@ -2,13 +2,237 @@
 #include "test/battle.h"
 #include "battle_koanko.h"
 #include "battle_koanko_smeargle.h"
+#include "battle_bug_space.h"
+#include "battle_entry_scripts.h"
+#include "battle_script_native.h"
+#include "battle_reduction.h"
 #include "battle_temp_ally.h"
+#include "battle_sprite_scale.h"
+#include "battle_controllers.h"
 #include "battle_setup.h"
 #include "data.h"
 #include "malloc.h"
+#include "item.h"
+#include "money.h"
+#include "task.h"
 #include "trainer_break_bars.h"
+#include "constants/battle_script_commands.h"
 
 static s32 ScoreKoankoLeadBoomburst(u32 battler, u16 move);
+
+// Observe the existing production traversal without influencing a decision.
+static EWRAM_DATA struct
+{
+    u32 startingMoney;
+    u32 lastMoney;
+    u8 payouts;
+    u8 transitions;
+    u8 phase;
+    bool8 sawConjuring;
+    bool8 sawAlly;
+    bool8 sawOpening;
+    bool8 sawCrushOnly;
+    bool8 sawAdaptation;
+} sAcceptance = {0};
+
+static void ObserveKoankoAcceptance(u8 taskId)
+{
+    if (gBattleStruct == NULL)
+    {
+        DestroyTask(taskId);
+        return;
+    }
+    EXPECT_EQ(TRAINER_BATTLE_PARAM.opponentA, TRAINER_KOANKO);
+    EXPECT(gBattleTypeFlags & BATTLE_TYPE_TRAINER);
+    EXPECT_EQ(CountTotalItemQuantityInBag(ITEM_MAX_REVIVE), 2);
+    EXPECT_EQ(CountTotalItemQuantityInBag(ITEM_ETHER), 3);
+
+    u32 money = GetMoney(&gSaveBlock1Ptr->money);
+    if (gBattleResults.opponentFaintCounter < 12)
+    {
+        EXPECT_EQ(gBattleOutcome, 0);
+        EXPECT_EQ(money, sAcceptance.startingMoney);
+    }
+    if (money != sAcceptance.lastMoney)
+    {
+        EXPECT_GT(money, sAcceptance.lastMoney);
+        EXPECT_EQ(gBattleResults.opponentFaintCounter, 12);
+        sAcceptance.payouts++;
+        sAcceptance.lastMoney = money;
+    }
+    u32 phase = gBattleStruct->koankoPhase;
+    if (phase == KOANKO_CONJURING) sAcceptance.sawConjuring = TRUE;
+    if (phase == KOANKO_CONJURED_TEAM && sAcceptance.phase != phase) sAcceptance.transitions++;
+    sAcceptance.phase = phase;
+    if (TempAllyGetState() == TEMP_ALLY_ACTIVE) sAcceptance.sawAlly = TRUE;
+    if (gBattleStruct->bugSpace.active)
+    {
+        if (gBattleStruct->bugSpace.mode == BUGSPACE_MODE_KOANKO_OPENING) sAcceptance.sawOpening = TRUE;
+        if (gBattleStruct->bugSpace.mode == BUGSPACE_MODE_KOANKO_CRUSH_ONLY) sAcceptance.sawCrushOnly = TRUE;
+    }
+    if (gBattleStruct->koankoArceus.phase == KOANKO_ARCEUS_ADAPTED) sAcceptance.sawAdaptation = TRUE;
+}
+
+static void BS_StartKoankoAcceptance(void)
+{
+    NATIVE_ARGS();
+    memset(&sAcceptance, 0, sizeof(sAcceptance));
+    SetMoney(&gSaveBlock1Ptr->money, 10000);
+    sAcceptance.startingMoney = sAcceptance.lastMoney = GetMoney(&gSaveBlock1Ptr->money);
+    sAcceptance.phase = gBattleStruct->koankoPhase;
+    u32 taskId = CreateTask(ObserveKoankoAcceptance, 254);
+    EXPECT_LT(taskId, NUM_TASKS);
+    EXPECT(gTasks[taskId].func == ObserveKoankoAcceptance);
+    gBattlescriptCurrInstr = cmd->nextInstr;
+}
+
+static const struct __attribute__((packed))
+{
+    u8 native;
+    void (*func)(void);
+    u8 ret;
+} sKoankoAcceptanceEntry = {B_SCR_OP_CALLNATIVE, BS_StartKoankoAcceptance, B_SCR_OP_RETURN};
+
+// Read the live authored first team. Keep the lifecycle shortcut above/below
+// separate from production-profile acceptance; do not force sequence AI here.
+static void KoankoProductionOriginal(u32 index)
+{
+    const struct TrainerMon *mon = &GetTrainerPartyFromId(TRAINER_KOANKO)[index];
+    OPPONENT(mon->species) {
+        struct Pokemon *pokemon = gBattleTestRunnerState->data.currentMon;
+        CreateMonWithIVs(pokemon, mon->species, mon->lvl, mon->nature, OTID_STRUCT_PRESET(0), 31);
+        static const u8 fields[] = {MON_DATA_HP_EV, MON_DATA_ATK_EV, MON_DATA_DEF_EV,
+            MON_DATA_SPATK_EV, MON_DATA_SPDEF_EV, MON_DATA_SPEED_EV};
+        for (u32 i = 0; i < ARRAY_COUNT(fields); i++)
+            SetMonData(pokemon, fields[i], &mon->ev[i]);
+        CalculateMonStats(pokemon);
+        Nature(mon->nature); Ability(mon->ability); Item(mon->heldItem);
+        Moves(mon->moves[0], mon->moves[1], mon->moves[2], mon->moves[3]);
+        if (mon->shouldUseDynamax)
+        {
+            DynamaxLevel(mon->dynamaxLevel);
+            GigantamaxFactor(mon->gigantamaxFactor);
+        }
+        Speed(GetMonData(pokemon, MON_DATA_SPEED));
+    }
+}
+
+AI_SINGLE_BATTLE_TEST("Koanko acceptance production twelve profiles complete one uninterrupted trainer battle")
+{
+    gBattleTestRunnerState->data.recordedBattle.opponentA = TRAINER_KOANKO;
+    GIVEN {
+        AI_FLAGS(GetTrainerAIFlagsFromId(TRAINER_KOANKO));
+        TurnZeroScript(B_TRAINER_OPPONENT_A, (const u8 *)&sKoankoAcceptanceEntry);
+        GIVE_PLAYER_ITEM(ITEM_MAX_REVIVE, 2);
+        GIVE_PLAYER_ITEM(ITEM_ETHER, 3);
+        // Controlled player strength isolates transitions while opponents keep
+        // real profiles, production AI and free first-team replacement choices.
+        PLAYER(SPECIES_HERACROSS) {
+            Level(MAX_LEVEL); Attack(9999); Speed(9999); Defense(9999); SpDefense(9999);
+            HP(9999); MaxHP(9999); Ability(ABILITY_SKILL_LINK); Moves(MOVE_ICICLE_SPEAR, MOVE_FEINT);
+        }
+        for (u32 i = 0; i < PARTY_SIZE; i++)
+            KoankoProductionOriginal(i);
+    } WHEN {
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); }
+        for (u32 i = 1; i < PARTY_SIZE; i++)
+            TURN { MOVE(player, MOVE_ICICLE_SPEAR); }
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); }
+        TURN { MOVE(player, MOVE_FEINT); }
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); }
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); }
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); }
+        SUMMONED_ALLY();
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); }
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); }
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); }
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); }
+        TURN { MOVE(player, MOVE_ICICLE_SPEAR); }
+    } SCENE {
+        MESSAGE("You thought that was all?\nThen watch what I can create!{PAUSE_UNTIL_PRESS}");
+        MESSAGE("The opposing Smeargle fainted!");
+        MESSAGE("The opposing TX Rollback fainted!");
+        MESSAGE("The opposing Calyrex fainted!");
+        MESSAGE("The opposing Eternatus fainted!");
+        MESSAGE("The opposing Dialga fainted!");
+        MESSAGE("Behold, your final trial!");
+        MESSAGE("The opposing Arceus fainted!");
+    } THEN {
+        u32 observer = FindTaskIdByFunc(ObserveKoankoAcceptance);
+        EXPECT_LT(observer, NUM_TASKS);
+        ObserveKoankoAcceptance(observer); // Include the final bookkeeping frame.
+        EXPECT_EQ(sAcceptance.transitions, 1);
+        EXPECT(sAcceptance.sawConjuring);
+        EXPECT(sAcceptance.sawAlly);
+        EXPECT(sAcceptance.sawOpening);
+        EXPECT(sAcceptance.sawCrushOnly);
+        EXPECT(sAcceptance.sawAdaptation);
+        EXPECT_EQ(sAcceptance.payouts, 1);
+        EXPECT_GT(GetMoney(&gSaveBlock1Ptr->money), sAcceptance.startingMoney);
+        EXPECT_EQ(gBattleResults.opponentFaintCounter, 12);
+        EXPECT_EQ(gBattleStruct->koankoPhase, KOANKO_CONJURED_TEAM);
+        EXPECT_EQ(TRAINER_BATTLE_PARAM.opponentA, TRAINER_KOANKO);
+        EXPECT_EQ(gBattleOutcome, B_OUTCOME_WON);
+        EXPECT_EQ(gBattlersCount, 2);
+        EXPECT_EQ(TempAllyGetState(), TEMP_ALLY_NONE);
+        EXPECT_EQ(gBattleStruct->bugSpace.active, FALSE);
+        EXPECT_EQ(KoankoArceusGetForm(1), SPECIES_NONE);
+        EXPECT_EQ(GetMonData(GetBattlerMon(1), MON_DATA_SPECIES), SPECIES_ARCEUS_NORMAL);
+    } AFTER_CLEANUP {
+        u32 observer = FindTaskIdByFunc(ObserveKoankoAcceptance);
+        if (observer != TASK_NONE) DestroyTask(observer);
+        EXPECT_EQ(ReductionIsActive(), FALSE);
+        EXPECT_EQ(gBattleStruct->txRollback.combatProfile, TX_PROFILE_NONE);
+        EXPECT_EQ(TempAllyGetState(), TEMP_ALLY_NONE);
+        EXPECT_EQ(gPartiesCount[B_TRAINER_PARTNER], 0);
+        EXPECT_EQ(gBattleStruct->bugSpace.active, FALSE);
+        EXPECT_EQ(sAcceptance.payouts, 1);
+        EXPECT_EQ(CountTotalItemQuantityInBag(ITEM_MAX_REVIVE), 2);
+        EXPECT_EQ(CountTotalItemQuantityInBag(ITEM_ETHER), 3);
+    }
+}
+
+SINGLE_BATTLE_TEST("Koanko acceptance fresh ordinary singles keeps normal rendering and no encounter ownership")
+{
+    GIVEN {
+        FORCE_MOVE_ANIM(TRUE);
+        PLAYER(SPECIES_PIKACHU) { Speed(20); Moves(MOVE_TACKLE); }
+        OPPONENT(SPECIES_WOBBUFFET) { Speed(10); Moves(MOVE_CELEBRATE); }
+    } WHEN {
+        TURN { MOVE(player, MOVE_TACKLE); MOVE(opponent, MOVE_CELEBRATE); }
+    } SCENE {
+        ANIMATION(ANIM_TYPE_MOVE, MOVE_TACKLE, player);
+        HP_BAR(opponent);
+    } THEN {
+        EXPECT_EQ(gBattlersCount, 2);
+        EXPECT_EQ(TempAllyGetState(), TEMP_ALLY_NONE);
+        EXPECT_EQ(gBattleStruct->bugSpace.active, FALSE);
+        EXPECT_EQ(gBattleStruct->koankoArceus.phase, KOANKO_ARCEUS_DORMANT);
+        EXPECT_EQ(BattleSpriteScaleCurrent(0), BATTLE_SPRITE_SCALE_ONE);
+        EXPECT_EQ(BattleSpriteScaleCurrent(1), BATTLE_SPRITE_SCALE_ONE);
+    } AFTER_CLEANUP { FORCE_MOVE_ANIM(FALSE); }
+}
+
+DOUBLE_BATTLE_TEST("Koanko acceptance fresh ordinary doubles shares the player party and renders all four mons normally")
+{
+    GIVEN {
+        PLAYER(SPECIES_PIKACHU) { Speed(40); Moves(MOVE_CELEBRATE); }
+        PLAYER(SPECIES_MARILL) { Speed(30); Moves(MOVE_CELEBRATE); }
+        OPPONENT(SPECIES_WOBBUFFET) { Speed(20); Moves(MOVE_CELEBRATE); }
+        OPPONENT(SPECIES_WYNAUT) { Speed(10); Moves(MOVE_CELEBRATE); }
+    } WHEN {
+        TURN { MOVE(playerLeft, MOVE_CELEBRATE); MOVE(playerRight, MOVE_CELEBRATE); MOVE(opponentLeft, MOVE_CELEBRATE); MOVE(opponentRight, MOVE_CELEBRATE); }
+    } THEN {
+        EXPECT_EQ(gBattlersCount, 4);
+        EXPECT_EQ(TempAllyGetState(), TEMP_ALLY_NONE);
+        EXPECT_EQ(GetBattlerTrainer(0), B_TRAINER_PLAYER);
+        EXPECT_EQ(GetBattlerTrainer(2), B_TRAINER_PLAYER);
+        EXPECT_EQ(gBattleStruct->bugSpace.active, FALSE);
+        EXPECT_EQ(gBattleStruct->koankoArceus.phase, KOANKO_ARCEUS_DORMANT);
+        for (u32 battler = 0; battler < MAX_BATTLERS_COUNT; battler++)
+            EXPECT_EQ(BattleSpriteScaleCurrent(battler), BATTLE_SPRITE_SCALE_ONE);
+    }
+}
 
 TEST("Koanko replacement creates fresh opponents while preserving player, field, inventory and trainer identity")
 {

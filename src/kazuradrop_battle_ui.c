@@ -22,6 +22,7 @@
 #include "graphics.h"
 #include "servant_sigil.h"
 #include "test_runner.h"
+#include "malloc.h"
 
 // =====================================================================
 // Graphics
@@ -119,7 +120,8 @@ static const struct OamData sOamData_Number =
 
 static u8 sBugSpacePanelSpriteId[MAX_BATTLERS_COUNT];
 static u8 sNumberSpriteId[MAX_BATTLERS_COUNT];
-static u8 sKazuraDialogWindowId;
+static EWRAM_DATA u8 sKazuraDialogWindowId = 0;
+static EWRAM_DATA u8 *sKazuraDialogText = NULL;
 
 // =====================================================================
 // Forward declarations
@@ -273,6 +275,7 @@ static void WriteThresholdIntoPanel(u32 panelSpriteId)
 
 void InitKazuradropBattleUI(void)
 {
+    sKazuraDialogWindowId = WINDOW_NONE;
     for (u32 battler = 0; battler < MAX_BATTLERS_COUNT; battler++)
     {
         sBugSpacePanelSpriteId[battler] = MAX_SPRITES;
@@ -283,6 +286,7 @@ void InitKazuradropBattleUI(void)
 
 void FreeKazuradropBattleUI(void)
 {
+    HideKazuraDialogueBox();
     for (u32 battler = 0; battler < MAX_BATTLERS_COUNT; battler++)
         DestroyBugSpacePanel(battler);
     DestroyAllServantSigils();
@@ -566,13 +570,21 @@ static void DrawKazuraWindowFrame(u8 windowId)
 
 void ShowKazuraDialogueBox(const u8 *str)
 {
-    u8 buffer[512];
-
-    sKazuraDialogWindowId = 0xFF; // sentinel reset before use
+    // The asynchronous printer retains this pointer until dismissal. A local
+    // stack buffer becomes invalid as soon as this function returns.
+    HideKazuraDialogueBox();
+    sKazuraDialogText = Alloc(512);
+    if (sKazuraDialogText == NULL)
+        return;
     LoadBgTiles(0, sKazuraBoxGfx, sizeof(sKazuraBoxGfx), KAZ_WIN_BASE_TILE_NUM);
     LoadPalette(sKazuraBoxPal, BG_PLTT_ID(KAZ_WIN_PALETTE_NUM), PLTT_SIZE_4BPP);
 
     sKazuraDialogWindowId = AddWindow(&sKazuraDialogWindowTemplate);
+    if (sKazuraDialogWindowId == WINDOW_NONE)
+    {
+        FREE_AND_SET_NULL(sKazuraDialogText);
+        return;
+    }
     // DebugPrintf("KazuraDialogWindowId: %d", sKazuraDialogWindowId);
     FillWindowPixelBuffer(sKazuraDialogWindowId, PIXEL_FILL(KAZ_BOX_INTERIOR_COLOR));
 
@@ -606,12 +618,12 @@ void ShowKazuraDialogueBox(const u8 *str)
 
     DrawKazuraWindowFrame(sKazuraDialogWindowId);
 
-    StringCopy(buffer, str);
-    BreakStringAutomatic(buffer, 220, 2, FONT_NORMAL, SHOW_SCROLL_PROMPT);
+    StringCopy(sKazuraDialogText, str);
+    BreakStringAutomatic(sKazuraDialogText, 220, 2, FONT_NORMAL, SHOW_SCROLL_PROMPT);
 
     static const u8 color[3] = {0, 9, 11}; // bgColor=transparent (keeps baked grid), fgColor, shadowColor
     AddTextPrinterParameterized4(sKazuraDialogWindowId, FONT_NORMAL,
-                                 4, 2, 0, 0, color, 1, buffer);
+                                 4, 2, 0, 0, color, 1, sKazuraDialogText);
 
     PutWindowTilemap(sKazuraDialogWindowId);
     CopyWindowToVram(sKazuraDialogWindowId, COPYWIN_FULL);
@@ -620,14 +632,22 @@ void ShowKazuraDialogueBox(const u8 *str)
 
 void HideKazuraDialogueBox(void)
 {
-    if (sKazuraDialogWindowId == 0xFF)
-        return;
-    ClearWindowTilemap(sKazuraDialogWindowId);
-    CopyWindowToVram(sKazuraDialogWindowId, COPYWIN_FULL);
-    CopyBgTilemapBufferToVram(0);
-    RemoveWindow(sKazuraDialogWindowId);
-    sKazuraDialogWindowId = 0xFF;
+    if (sKazuraDialogText != NULL && sKazuraDialogWindowId != WINDOW_NONE)
+    {
+        DeactivateSingleTextPrinter(sKazuraDialogWindowId, WINDOW_TEXT_PRINTER);
+        ClearWindowTilemap(sKazuraDialogWindowId);
+        CopyWindowToVram(sKazuraDialogWindowId, COPYWIN_FULL);
+        CopyBgTilemapBufferToVram(0);
+        RemoveWindow(sKazuraDialogWindowId);
+    }
+    sKazuraDialogWindowId = WINDOW_NONE;
+    TRY_FREE_AND_SET_NULL(sKazuraDialogText);
 }
+
+#if TESTING
+const u8 *Test_GetKazuraDialogueText(void) { return sKazuraDialogText; }
+u32 Test_GetKazuraDialogueWindow(void) { return sKazuraDialogWindowId; }
+#endif
 
 // =====================================================================
 // Undefine data field aliases

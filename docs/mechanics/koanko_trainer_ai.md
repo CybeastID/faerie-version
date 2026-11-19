@@ -6,6 +6,50 @@ twelve roster members. The previously approved shared AI/Break Bar fixes remain.
 This document supersedes the earlier Stage11 milestone's statement that most
 members merely return their ordinary scores unchanged.
 
+## Current completed-encounter revalidation (2026-11-18)
+
+The detailed counts at the end are historical `mypatch` evidence. Current work
+uses dirty `pre-s9-real` based on `776e5d4e9274c7171129bf2af75e4347f9193eff`.
+Stages 01-09 now exist; earlier missing-stage caveats do not request rebuilding
+them. The [Stage 11 acceptance ledger](../extra%20docs/KoankoDev/planning/11_koanko_ai_validation.md#current-acceptance-ledger-2026-11-18)
+records current gates and pending user-run commands.
+
+Latest steering: the user parked the fixed-sequence TX fixture after it selected
+Wish instead of the predicted Doom Desire, and moved to Stage 10. The proposed
+108-point tie explanation was incomplete and is not runtime acceptance evidence.
+No diagnostic scorer or further TX tuning was installed. Stage 10 uses the
+dedicated `Koanko acceptance` traversal; the unresolved TX fixture remains
+explicitly separate rather than being marked passing or KNOWN_FAILING.
+
+This pass found the opening Arceus HP floor missing from shared AI outcomes.
+The existing pure `KoankoArceusIsProtected`/`KoankoArceusClampHpLoss` queries now
+inform survival, reachable damage and KO checks in `battle_ai_util.c`. Protection
+ranks before original/saved layers and is not extrapolated through an unexecuted
+phase. No phase, seal, bar, inventory or gimmick is changed by these queries;
+their lifetime remains the existing battle-owned Arceus state. No RAM is added.
+This is a small shared-engine integration whose survival/phase semantics need
+review during upstream merges; roster tactics and weights are unchanged.
+
+New `Koanko AI acceptance` fixtures cover the real protected opening and actual
+adaptation before fresh move selection. The TX production-scorer fixture also
+now asserts Meteo really executes under authored flags, rather than proving only
+Reduction. These changes are implemented but uncompiled/untested; ordinary AI,
+Koanko AI/Tactics/TX and whole-encounter controls require user-run verification.
+
+Initial user validation found two new fixture failures (scripted Arceus masking
+unobserved Judgment, and TX phase initialization depending on a scoring call),
+plus ordinary timing/control failures. The Arceus fixture now starts with a real
+AI controller; TX now initializes phase/entry at Turn 0 before scoring. Dormant
+Arceus state bypasses external floor queries in shared hot paths, and the clamp
+is evaluated once outside `min/max`. The vanilla Steven tests are restored exactly:
+their Reflect expectation also protects tie-breaking. Doubles now publishes the
+TESTING tie count before tagged RNG reads it, preventing use of a previous
+target's candidate count. No release-selection algorithm changes. The untouched
+vanilla tests and `TIE_BREAK_SCORE` controls must verify this correction. These
+corrections await user rerun;
+the reported 33-vs-31-frame failure is not yet certified resolved. No tactical
+weights, production encounter scripts, timing budgets or IWRAM allocations change.
+
 ## Dispatch and scoring contract
 
 `BattleAI_SetupFlags` calls `KoankoSetupTrainerAi` when no explicit dynamic
