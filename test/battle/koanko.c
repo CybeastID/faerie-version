@@ -292,6 +292,7 @@ TEST("Koanko replacement creates fresh opponents while preserving player, field,
     }
     EXPECT_EQ(gBattleStruct->koankoPhase, KOANKO_CONJURED_TEAM);
     EXPECT_EQ(gBattleStruct->givenExpMons[0], 0);
+    EXPECT(gBattleStruct->battlerState[B_POSITION_OPPONENT_LEFT].notOnField);
     EXPECT_EQ(gBattleStruct->givenExpMons[1], 0x15);
     EXPECT_EQ(gBattleStruct->gimmick.activated[B_POSITION_OPPONENT_LEFT][GIMMICK_DYNAMAX], TRUE);
     // Only the opponent's Tera-used flag is renewed; the player's Tera usage is untouched.

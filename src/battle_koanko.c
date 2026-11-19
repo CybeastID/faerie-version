@@ -174,6 +174,10 @@ void ConjureKoankoTeam(void)
 
     u32 battler = B_POSITION_OPPONENT_LEFT;
     memset(&gBattleStruct->battlerState[battler], 0, sizeof(gBattleStruct->battlerState[battler]));
+    // The party has changed, but the outgoing fainted slot is still selected
+    // until replacement runs. Menu reshow must not render the fresh mon at
+    // that old index (notably Arceus in slot 5). Switch-in clears this flag.
+    gBattleStruct->battlerState[battler].notOnField = TRUE;
     memset(&gSpecialStatuses[battler], 0, sizeof(gSpecialStatuses[battler]));
     memset(&gProtectStructs[battler], 0, sizeof(gProtectStructs[battler]));
     memset(&gBattleStruct->illusion[battler], 0, sizeof(gBattleStruct->illusion[battler]));

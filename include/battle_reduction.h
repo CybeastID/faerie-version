@@ -22,7 +22,9 @@ struct ReductionOccupant
 struct ReductionData
 {
     bool8 active;
-    bool8 grace;
+    bool8 grace:1;
+    bool8 repeatEachLoss:1; // Koanko's clock uses each loss twice; other initializers stay linear.
+    bool8 repeatedLoss:1;
     u8 nextLoss;
     u8 affectedSide;
     struct ReductionOccupant occupant[MAX_BATTLERS_COUNT];
@@ -32,6 +34,7 @@ bool32 ReductionIsActive(void);
 bool32 ReductionIsScaled(u32 battler);
 void ReductionActivate(void);
 bool32 ReductionTryActivate(u32 initialLoss, u32 affectedSide);
+bool32 ReductionTryActivateKoanko(void);
 bool32 ReductionEndTurn(enum BattlerId battler);
 void ReductionBeginMutation(u32 battler);
 // Nested canonical mutations must finish updating stats and HP before End.

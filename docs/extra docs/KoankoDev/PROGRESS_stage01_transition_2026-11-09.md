@@ -1,5 +1,25 @@
 # Stage 01 transition polish (commit ba3fd15d, local only, NOT pushed, NOT compiled/run)
 
+## Playtest follow-up (2026-11-18; implemented, uncompiled/unrun)
+
+`ConjureKoankoTeam` now leaves the cleared opponent battler state marked
+`notOnField`. The party is already regenerated while the fainted battle mon and
+old party index remain selected until ordinary replacement; an old index of 5
+therefore addresses the future Arceus. Clearing the flag let party-menu return
+reconstruct Arceus and display its healthbox before Smeargle's actual send-out.
+Keeping it true suppresses that reconstruction; existing `SwitchInClearSetData`
+clears it when the real replacement loads. Party order, phase transitions,
+scripts, AI and sprite/healthbox allocation routines are unchanged.
+
+`test/battle/koanko_reshow.c` exercises real simultaneous player/opponent faints,
+the conjuring transition, full menu close/reshow and ordinary Smeargle send-out.
+Both outgoing slot 0 and slot 5 are covered. The replay harness bypasses actual
+party selection, so restoration is injected by a test task at the real transition
+boundary. It checks absence of reconstructed opponent mon sprites and a hidden
+healthbox before entry, then one visible Smeargle and healthbox. The original
+state-preservation unit also asserts `notOnField`. User-run focused tests, ROM
+build and manual party-menu reproduction are pending; no computer use was used.
+
 ## Implemented
 1. Presentation: BattleScript_KoankoConjureTeam is now fake-victory sting -> existing two-line reveal slide -> crossfade to mus_vs_kazuradrop -> replacement. Reuses BS_KazuradropFakeVictorySting / BS_KazuradropSendoutMusic (generic bodies). Outcome stays 0; no win/reward code.
 2. Music identity (Codex stage 01 left this open): VERIFIED. sound/song_table.inc entry #562 is `song mus_vs_kazuradrop`, and MUS_KAZURADROP_APPEARS == 562 (also END_MUS).

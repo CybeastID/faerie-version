@@ -360,7 +360,7 @@ void BS_TxRollbackTryWish(void)
         gBattlescriptCurrInstr = BattleScript_TxWishReciprocity;
         break;
     case TX_WISH_REDUCTION:
-        if (!ReductionTryActivate(1, B_SIDE_PLAYER))
+        if (!ReductionTryActivateKoanko())
         {
             gBattlescriptCurrInstr = cmd->failInstr;
             return;

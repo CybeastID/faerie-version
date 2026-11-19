@@ -166,11 +166,21 @@ spends Castoria's allowance, and each effect can be reused when eligible.
   HP rescaling and redistribution such as Pain Split do not. It cannot recurse,
   revive TX, or heal a pending-break layer.
 - **Reduction (solo profile only):** replaces Restoration in the outcome list.
-  Starts the existing player-side curse at 1, then 2, then 3 levels per subsequent
-  turn, with casting-turn grace. `ReductionTryActivate(initialLoss, affectedSide)`
-  is idempotent; an already active curse cannot reset, stack or reward a failed
-  recast. `ReductionActivate()` remains the original 10+ player-side wrapper.
-  The curse owns its own state and persists after either TX owner's defeat.
+  `ReductionTryActivateKoanko()` starts the player-side curse at losses of
+  1, 1, 2, 2, 3, 3, etc., preserving the casting-turn skip. Its battle-owned
+  clock persists after TX's defeat and through later opponent replacements.
+  Switching clears the departing player's accumulated loss; the incoming mon
+  takes the current shared loss at its first eligible end turn, without another
+  grace turn. Activation remains idempotent: an active curse cannot reset, stack
+  or reward a failed recast. `ReductionTryActivate(initialLoss, affectedSide)`
+  remains linear, including Castoria's original `ReductionActivate()` 10+ wrapper.
+  The two cadence bits share the existing grace byte; the four-byte clock header
+  and battle cleanup are unchanged. No new IWRAM or persistent save state is used.
+
+Playtest follow-up (2026-11-18): focused fixtures cover six successive ticks,
+fresh replacement losses, persistence through four opponents after TX's defeat,
+idempotence and the original initializer. These changes have not been compiled
+or run; the user requested control of tests and the ROM build.
 
 Reversal, Reclamation and Calamity bypass initial defensive prevention, including
 Protect, Substitute, Soundproof, Contrary, stat-loss protection and reflection.

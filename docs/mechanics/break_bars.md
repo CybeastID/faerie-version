@@ -69,6 +69,24 @@ that transformation disables her break interception.
 
 ## UI lifecycle
 
+In standard single/double battles, the party menu HP fill uses the owner's current
+Break Bar highlight/body colors, including the red exhausted base. An inactive-start
+config with no previously active bars retains ordinary HP colors. The menu resolves
+its reordered Pokemon back through `GetPartyIdFromBattleSlot` to the existing
+`PartyState`; it does not create state or change HP, bar width, icon animation,
+phase execution or cleanup. `GetBreakBarFillColors` shares the healthbox's palette
+data, and `DisplayPartyPokemonHPBarCheck` replaces only the two fill entries after
+the ordinary draw. Outside battle and in multi/partner layouts, rendering remains
+vanilla. This adds no palette allocation or lifetime management.
+
+Focused coverage: `Break Bar party menu colors follow original party owners only
+in standard battles` in `test/battle/break_bar_presentation.c` covers all layers,
+reordered/benched owners, inactive-start bases and battle/multi gating. The first
+user run failed because the inactive-start fixture retained five bars from its
+color loop; the fixture now resets the count to zero. Rerun pending. Palette
+placement, menu reopening, item-HP redraws and unchanged
+out-of-battle rendering still need manual verification.
+
 The module owns per-battler palette slots and the entry fade, so different stack
 colors can coexist. Menu-return paths call `ReshowBreakBars`; battle cleanup calls
 `FreeBreakBarGraphics`. Phase changes cancel obsolete fades before changing a

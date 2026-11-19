@@ -1,5 +1,47 @@
 # Upstream modification ledger
 
+## Battle party-menu Break Bar HP colors (2026-11-19)
+
+- `src/party_menu.c:DisplayPartyPokemonHPBarCheck`: narrow presentation hook replaces the two HP-fill palette entries using `battle_break_bar.c:GetBreakBarFillColors`. Its selector maps reordered standard single/double menu slots through `GetPartyIdFromBattleSlot` to original `PartyState` owners. Outside battle and multi/partner paths retain vanilla coloring. No gameplay, HP fraction, icon or state-lifecycle changes.
+- `include/party_menu.h` / `src/party_menu.c`: test-only selector wrapper alongside existing party-menu test seams.
+- Regression: `Break Bar party menu colors follow original party owners only in standard battles` in `test/battle/break_bar_presentation.c`; first user run failed at the inactive-start fixture, which retained five bars from the color loop. The fixture now resets the count to zero; rerun pending. Manual menu palette/redraw verification is pending.
+- Merge impact: one localized upstream renderer hook, no rendering algorithm refactor. Preserve highlight/body orientation if upstream changes party-menu palette indices, and recheck owner mapping if battle-party ordering changes.
+
+## Koanko playtest: Reduction cadence and premature opponent reshow (2026-11-18)
+
+- `src/battle_koanko.c:ConjureKoankoTeam`: after clearing the outgoing battler's
+  local state, explicitly retain `notOnField = TRUE`. Regenerating the party
+  intentionally leaves the fainted battle mon and outgoing party index in place
+  until normal replacement. At old slot 5, that index now addresses living Arceus;
+  erasing the flag let menu restoration create its sprite and show its healthbox.
+  This is an on-field lifetime error at reconstruction, not premature Arceus
+  switch-in or encounter-phase advancement. The existing
+  `battle_main.c:SwitchInClearSetData` clears the flag for Smeargle's real entry.
+  No generic reshow, sprite ownership, party-index selection or send-out algorithm
+  changes. Upstream maintenance remains confined to the existing custom conjuring
+  module; review the meaning/lifetime of `notOnField` if upstream changes faint,
+  switch-in or menu reconstruction. Audited readers are
+  `reshow_battle_screen.c:CreateBattlerSprite/CreateHealthboxSprite` (unmodified).
+- `battle_reduction.c:ReductionTryActivateKoanko/ReductionEndTurn` and
+  `battle_tx_wishes.c:BS_TxRollbackTryWish`: custom-module cadence selection only.
+  Koanko uses 1/1/2/2/etc.; the generic initializer and Castoria's 10/11/12/etc.
+  remain linear. Mode/parity occupy two bits beside grace in its existing byte;
+  a static assertion guards the unchanged four-byte clock header. No new IWRAM,
+  save flags/vars, engine hook, occupant cleanup or end-turn ordering changes.
+
+Regressions: `Koanko Reduction` covers casting skip, six ticks, switching without
+new grace, owner defeat/four later opponents and idempotence. `Koanko replacement`
+covers the original state-preservation unit and complete menu close/reshow with
+outgoing slots 0/5, followed by real simultaneous replacement and Smeargle send-out.
+The menu regression asserts zero opponent mon sprites and a hidden healthbox
+before entry, then one owned visible Smeargle sprite after entry. Recorded
+playback bypasses the party UI; the fixture injects its real restoration path at
+the actual conjuring boundary. Run `Arcanum Wish Reduction` as the linear
+compatibility control and the ordinary full-menu sprite-scale regression as a
+restoration control. Source reviewed only: tests and ROM build were not executed,
+at the user's request. Manual verification of the reported party-menu sequence
+remains required.
+
 ## Stage 10 production traversal observations (2026-11-18)
 
 The latest Stage 10 milestone changes only `test/battle/koanko.c` and acceptance
@@ -1083,7 +1125,8 @@ validation. [Behavior/state/codeflow](tx_rollback.md),
 The substantive implementation stays in custom `battle_tx_health.c`,
 `battle_tx_rollback.c`, `battle_tx_wishes.c`, `battle_reduction.c` and the existing
 `battle_koanko.c:KoankoOnSwitchIn` entry hook. Original Reduction calls use the
-idempotent 10+ wrapper; solo calls request 1+. No generic AI algorithm, type chart
+idempotent linear 10+ wrapper; solo calls use the dedicated repeated-loss wrapper
+(1/1/2/2/etc., adjusted 2026-11-18). No generic AI algorithm, type chart
 or new Break Bar executor is added. This limits new integration surface, but the
 shared controller/stat-copy paths remain semantic maintenance hotspots. Overlap
 with later upstream edits predicts review work, not a proven textual conflict.

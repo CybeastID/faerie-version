@@ -89,15 +89,19 @@ TEST("Koanko Reduction activation is idempotent and preserves accumulated occupa
     EXPECT_EQ(ReductionTryActivate(MAX_LEVEL + 1, B_SIDE_PLAYER), FALSE);
     EXPECT_EQ(ReductionTryActivate(1, NUM_BATTLE_SIDES), FALSE);
     EXPECT_EQ(ReductionIsActive(), FALSE);
-    EXPECT_EQ(ReductionTryActivate(1, B_SIDE_PLAYER), TRUE);
-    EXPECT_EQ(gBattleStruct->reduction.grace, TRUE);
+    EXPECT_EQ(ReductionTryActivateKoanko(), TRUE);
+    EXPECT(gBattleStruct->reduction.grace);
+    EXPECT(gBattleStruct->reduction.repeatEachLoss);
     EXPECT_EQ(gBattleStruct->reduction.nextLoss, 1);
     EXPECT_EQ(gBattleStruct->reduction.affectedSide, B_SIDE_PLAYER);
     gBattleStruct->reduction.nextLoss = 7;
+    gBattleStruct->reduction.repeatedLoss = TRUE;
     gBattleStruct->reduction.occupant[0].lostLevels = 21;
-    EXPECT_EQ(ReductionTryActivate(1, B_SIDE_PLAYER), FALSE);
+    EXPECT_EQ(ReductionTryActivateKoanko(), FALSE);
     ReductionActivate();
     EXPECT_EQ(gBattleStruct->reduction.nextLoss, 7);
+    EXPECT(gBattleStruct->reduction.repeatEachLoss);
+    EXPECT(gBattleStruct->reduction.repeatedLoss);
     EXPECT_EQ(gBattleStruct->reduction.occupant[0].lostLevels, 21);
     FREE_AND_SET_NULL(gBattleStruct);
 }
@@ -108,7 +112,11 @@ TEST("TX profiles retain the original ten-plus Reduction compatibility initializ
     ReductionActivate();
     EXPECT_EQ(ReductionIsActive(), TRUE);
     EXPECT_EQ(gBattleStruct->reduction.nextLoss, 10);
+    EXPECT(!gBattleStruct->reduction.repeatEachLoss);
     EXPECT_EQ(gBattleStruct->reduction.affectedSide, B_SIDE_PLAYER);
+    EXPECT_EQ(ReductionTryActivateKoanko(), FALSE);
+    EXPECT(!gBattleStruct->reduction.repeatEachLoss);
+    EXPECT_EQ(gBattleStruct->reduction.nextLoss, 10);
     FREE_AND_SET_NULL(gBattleStruct);
 }
 
@@ -288,7 +296,7 @@ AI_SINGLE_BATTLE_TEST("Koanko TX entry registers only solo combat capabilities w
     }
 }
 
-AI_SINGLE_BATTLE_TEST("Koanko Reduction Wish skips its casting turn then applies one two three")
+AI_SINGLE_BATTLE_TEST("Koanko Reduction Wish skips its casting turn then applies one one two two three three")
 {
     gBattleTestRunnerState->data.recordedBattle.opponentA = TRAINER_KOANKO;
     GIVEN {
@@ -300,17 +308,20 @@ AI_SINGLE_BATTLE_TEST("Koanko Reduction Wish skips its casting turn then applies
             Moves(MOVE_WISH, MOVE_DOOM_DESIRE, MOVE_PROTECT); }
     } WHEN {
         TURN { MOVE(player, MOVE_SEISMIC_TOSS); EXPECT_SEND_OUT(opponent, 1); }
-        for (u32 i = 0; i < 4; i++)
+        for (u32 i = 0; i < 7; i++)
             TURN { MOVE(player, MOVE_CELEBRATE); }
     } SCENE {
         MESSAGE("A wish for Reduction fell upon your team!");
         HP_BAR(opponent, damage: -25);
         MESSAGE("Reduction lowered Wobbuffet to Level 99!");
-        MESSAGE("Reduction lowered Wobbuffet to Level 97!");
+        MESSAGE("Reduction lowered Wobbuffet to Level 98!");
+        MESSAGE("Reduction lowered Wobbuffet to Level 96!");
         MESSAGE("Reduction lowered Wobbuffet to Level 94!");
+        MESSAGE("Reduction lowered Wobbuffet to Level 91!");
+        MESSAGE("Reduction lowered Wobbuffet to Level 88!");
         NOT MESSAGE("A wish for Reduction fell upon your team!");
     } THEN {
-        EXPECT_EQ(player->level, 94);
+        EXPECT_EQ(player->level, 88);
         EXPECT_EQ(gBattleStruct->reduction.nextLoss, 4);
         EXPECT_EQ(opponent->hp, 125);
         EXPECT_EQ(GetMonData(GetBattlerMon(0), MON_DATA_LEVEL), 100);
@@ -319,6 +330,40 @@ AI_SINGLE_BATTLE_TEST("Koanko Reduction Wish skips its casting turn then applies
         for (u32 stat = STAT_ATK; stat < NUM_STATS; stat++)
             growth += GetBattlerPartyState(1)->wishfulGrowth[stat];
         EXPECT_EQ(growth, 1);
+    }
+}
+
+AI_SINGLE_BATTLE_TEST("Koanko Reduction replacements start fresh and take the current tick without another grace turn")
+{
+    gBattleTestRunnerState->data.recordedBattle.opponentA = TRAINER_KOANKO;
+    GIVEN {
+        AI_FLAGS(AI_FLAG_DYNAMIC_FUNC);
+        SoloWishFixture(TX_WISH_REDUCTION);
+        PLAYER(SPECIES_WOBBUFFET) { Level(100); Speed(1000); Moves(MOVE_SEISMIC_TOSS, MOVE_CELEBRATE); }
+        PLAYER(SPECIES_ABRA) { Level(100); Speed(1000); Moves(MOVE_CELEBRATE); }
+        OPPONENT(SPECIES_WOBBUFFET) { HP(1); Speed(1); Moves(MOVE_CELEBRATE); }
+        OPPONENT(SPECIES_TX_ROLLBACK) { Level(101); Speed(1); Moves(MOVE_WISH, MOVE_DOOM_DESIRE, MOVE_PROTECT); }
+    } WHEN {
+        TURN { MOVE(player, MOVE_SEISMIC_TOSS); EXPECT_SEND_OUT(opponent, 1); }
+        TURN { MOVE(player, MOVE_CELEBRATE); }
+        TURN { MOVE(player, MOVE_CELEBRATE); }
+        TURN { SWITCH(player, 1); }
+        TURN { SWITCH(player, 0); }
+    } SCENE {
+        MESSAGE("A wish for Reduction fell upon your team!");
+        MESSAGE("Reduction lowered Wobbuffet to Level 99!");
+        MESSAGE("Reduction lowered Abra to Level 99!");
+        MESSAGE("Reduction lowered Wobbuffet to Level 98!");
+    } THEN {
+        EXPECT_EQ(player->level, 98);
+        EXPECT_EQ(gBattleStruct->reduction.occupant[0].lostLevels, 2);
+        EXPECT_EQ(gBattleStruct->reduction.nextLoss, 2);
+        EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_LEVEL), 100);
+        EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][1], MON_DATA_LEVEL), 100);
+    } AFTER_CLEANUP {
+        EXPECT_EQ(ReductionIsActive(), FALSE);
+        EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_LEVEL), 100);
+        EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][1], MON_DATA_LEVEL), 100);
     }
 }
 
@@ -344,8 +389,8 @@ AI_SINGLE_BATTLE_TEST("Koanko Reduction persists through four successive opponen
         TURN { MOVE(player, MOVE_CELEBRATE); }
     } THEN {
         EXPECT_EQ(ReductionIsActive(), TRUE);
-        EXPECT_EQ(player->level, 85);
-        EXPECT_EQ(gBattleStruct->reduction.nextLoss, 6);
+        EXPECT_EQ(player->level, 91);
+        EXPECT_EQ(gBattleStruct->reduction.nextLoss, 3);
         EXPECT_EQ(gBattleStruct->txRollback.ownerDefeated, TRUE);
         EXPECT_EQ(gBattleStruct->txRollback.stage, TX_ROLLBACK_NONE);
         EXPECT_EQ(gBattleStruct->txRollback.wishOutcome, TX_WISH_NONE);

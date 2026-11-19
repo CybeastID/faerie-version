@@ -96,6 +96,17 @@ u32 GetBreakBarCount(u32 battler)
     return owner->breakBarsRemaining;
 }
 
+const u16 *GetBreakBarFillColors(const struct PartyState *owner)
+{
+    if (owner == NULL || owner->breakBarConfig == NULL)
+        return NULL;
+    if (owner->breakBarsRemaining != 0)
+        return sBreakBarFillColors[owner->breakBarsRemaining];
+    if ((owner->breakBarConfig->flags & BREAK_BAR_START_INACTIVE) && owner->breakBarsPeak == 0)
+        return NULL;
+    return &sBreakBarBasePalette[14];
+}
+
 void InitializeWildBreakBar(u32 partySlot, const struct BreakBarConfig *config)
 {
     if (gBattleStruct == NULL || partySlot >= PARTY_SIZE || config == NULL

@@ -2,6 +2,7 @@
 #include "malloc.h"
 #include "battle.h"
 #include "battle_anim.h"
+#include "battle_break_bar.h"
 #include "battle_controllers.h"
 #include "battle_gfx_sfx_util.h"
 #include "battle_interface.h"
@@ -2714,10 +2715,34 @@ static void DisplayPartyPokemonMaxHP(u16 maxhp, struct PartyMenuBox *menuBox)
         DisplayPartyPokemonBarDetail(menuBox->windowId, gStringVar1, 0, &menuBox->infoRects->dimensions[16]);
 }
 
+static const u16 *GetPartyMenuBreakBarColors(struct Pokemon *mon)
+{
+    if (!gMain.inBattle || gPartyMenu.menuType != PARTY_MENU_TYPE_IN_BATTLE
+     || (gBattleTypeFlags & BATTLE_TYPE_PLAYER_HAS_PARTNER) || gBattleStruct == NULL)
+        return NULL;
+
+    // The menu reorders Pokemon, but PartyState stays indexed by original party slot.
+    for (u32 slot = 0; slot < PARTY_SIZE; slot++)
+    {
+        if (mon == &gParties[B_TRAINER_PLAYER][slot])
+            return GetBreakBarFillColors(&gBattleStruct->partyState[B_TRAINER_PLAYER][GetPartyIdFromBattleSlot(slot)]);
+    }
+    return NULL;
+}
+
 static void DisplayPartyPokemonHPBarCheck(struct Pokemon *mon, struct PartyMenuBox *menuBox)
 {
     if (GetMonData(mon, MON_DATA_SPECIES) != SPECIES_NONE)
+    {
         DisplayPartyPokemonHPBar(GetMonData(mon, MON_DATA_HP), GetMonData(mon, MON_DATA_MAX_HP), menuBox);
+        const u16 *colors = GetPartyMenuBreakBarColors(mon);
+        if (colors != NULL)
+        {
+            u32 palOffset = BG_PLTT_ID(GetWindowAttribute(menuBox->windowId, WINDOW_PALETTE_NUM));
+            LoadPalette(&colors[0], sHPBarPalOffsets[1] + palOffset, PLTT_SIZEOF(1));
+            LoadPalette(&colors[1], sHPBarPalOffsets[0] + palOffset, PLTT_SIZEOF(1));
+        }
+    }
 }
 
 static void DisplayPartyPokemonHPBar(u16 hp, u16 maxhp, struct PartyMenuBox *menuBox)
@@ -8653,6 +8678,11 @@ static u8 IndividualToCombinedPartyId(u8 index, enum BattlerId battler)
 }
 
 #if TESTING
+const u16 *Test_GetPartyMenuBreakBarColors(struct Pokemon *mon)
+{
+    return GetPartyMenuBreakBarColors(mon);
+}
+
 s8 Test_UpdatePartySelectionSingleLayout(s8 slotId, s8 movementDir, bool8 chooseHalf, u8 lastSelectedSlot)
 {
     struct PartyMenuInternal internal = {0};

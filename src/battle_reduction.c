@@ -13,6 +13,8 @@
 
 #define HP_FRACTION_ONE (1u << 24)
 
+STATIC_ASSERT(offsetof(struct ReductionData, occupant) == 4, ReductionClockHeaderSize);
+
 extern const u8 BattleScript_ReductionTick[];
 
 bool32 ReductionIsActive(void)
@@ -242,6 +244,14 @@ bool32 ReductionTryActivate(u32 initialLoss, u32 affectedSide)
     return TRUE;
 }
 
+bool32 ReductionTryActivateKoanko(void)
+{
+    if (!ReductionTryActivate(1, B_SIDE_PLAYER))
+        return FALSE;
+    gBattleStruct->reduction.repeatEachLoss = TRUE;
+    return TRUE;
+}
+
 bool32 ReductionEndTurn(enum BattlerId battler)
 {
     struct ReductionData *data = &gBattleStruct->reduction;
@@ -266,8 +276,13 @@ bool32 ReductionEndTurn(enum BattlerId battler)
     {
         if (data->grace)
             data->grace = FALSE;
+        else if (data->repeatEachLoss && !data->repeatedLoss)
+            data->repeatedLoss = TRUE;
         else
+        {
+            data->repeatedLoss = FALSE;
             data->nextLoss = min(MAX_LEVEL, data->nextLoss + 1);
+        }
     }
     return effect;
 }

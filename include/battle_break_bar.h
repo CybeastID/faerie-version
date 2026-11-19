@@ -74,6 +74,9 @@ bool32 AnimateConfiguredBreakBar(u32 battler);
 bool32 TryResolveBreakBarsAfterMove(void);
 
 void RefreshBreakBarPalette(u32 battler, bool32 animate);
+// Highlight/body colors for a party owner's current layer; NULL means ordinary HP colors.
+struct PartyState;
+const u16 *GetBreakBarFillColors(const struct PartyState *owner);
 bool32 DrawBreakBarIntroBase(u32 battler);
 bool32 TryShowBreakBarIntro(void);
 bool32 AnimateBreakBarIntro(u32 battler);

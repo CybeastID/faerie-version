@@ -18,7 +18,8 @@ Stage 04 to pass validation first. No commits, merges or upgrades were performed
   TX keeps Restoration; solo TX substitutes Reduction. Reciprocity resolves the
   registered owner rather than assuming the right-hand position.
 - The new idempotent Reduction initializer accepts starting loss and side.
-  Solo Reduction starts at 1, increases to 2/3/etc., and skips its casting turn.
+  Solo Reduction uses 1/1/2/2/3/3/etc. and skips its casting turn (2026-11-18
+  playtest adjustment). The original Castoria initializer remains linear.
   Existing Castoria/phase callers retain 10/11/12/etc. Both use the same persistent
   curse, shared turn counter, per-occupant loss and existing canonical stat layer.
 - Summoned TX's original bars now have actual maxHP 100% / 60% / 30%. Both reduced
@@ -94,12 +95,15 @@ fresh local effects, while any global Reduction remains active.
 4. Normal virtual-action selection commits a Wish outcome/recipient only when
    Wish wins. `BS_TxRollbackTryWish` consumes that commitment before revalidating
    the action, current owner, current profile, pending-break state and effect.
-5. Reduction calls `ReductionTryActivate(1, B_SIDE_PLAYER)`. Success enters the
+5. Reduction calls `ReductionTryActivateKoanko()`. Success enters the
    TX Reduction success script and the existing Wishful Thinking dispatcher once.
    An already active/stale request fails and grants no success reward.
 6. Existing end-turn Reduction processing consumes casting-turn grace, then
    applies one shared next-loss value to eligible living affected-side occupants.
-   The counter advances once per completed turn, independently of TX's survival.
+   The clock advances once per completed turn, using each loss twice,
+   independently of TX's survival. Its mode and parity share the existing grace
+   byte, without enlarging the four-byte header. Switching clears accumulated
+   occupant loss, but does not restart the clock or grant incoming grace.
 
 ### Summoned TX original bar transition
 
@@ -146,7 +150,7 @@ New `test/battle/tx_profiles.c` contains eight unit fixtures and five battle
 mechanism fixtures. They cover profile/formation isolation, Wish lists, idempotent
 1+/10+ initialization, repeated clean reloads with growth, 60/30 original-relative
 rounding, one-HP minimum, masked/full controller records, saved-layer coverage,
-pending versus genuine faint, real Koanko entry routing, 1/2/3 progression,
+pending versus genuine faint, real Koanko entry routing, 1/1/2/2/3/3 progression,
 persistence for four further turns after TX faints and the sole AI-selected
 reserve enters, controlled `SINGLE_BATTLE_TEST` replacements through four later
 party members, and left-owner Reciprocity. The controlled fixture seeds solo

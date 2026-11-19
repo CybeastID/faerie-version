@@ -9,6 +9,7 @@
 #include "event_data.h"
 #include "graphics.h"
 #include "palette.h"
+#include "party_menu.h"
 #include "script.h"
 #include "sprite.h"
 #include "task.h"
@@ -33,6 +34,62 @@ static const u16 sIntroColors[][2] =
     {RGB(27, 23, 4), RGB(17, 15, 2)},
     {RGB(25, 14, 17), RGB(27, 12, 11)},
 };
+
+SINGLE_BATTLE_TEST("Break Bar party menu colors follow original party owners only in standard battles")
+{
+    GIVEN {
+        PLAYER(SPECIES_WOBBUFFET) { BreakBars(&gTrainerBreakBarProfiles[4]); Moves(MOVE_CELEBRATE); }
+        OPPONENT(SPECIES_WOBBUFFET) { Moves(MOVE_CELEBRATE); }
+    } WHEN {
+        TURN { MOVE(player, MOVE_CELEBRATE); MOVE(opponent, MOVE_CELEBRATE); }
+    } THEN {
+        struct PartyMenu savedMenu = gPartyMenu;
+        u8 savedOrder[sizeof(gBattlePartyCurrentOrder)];
+        u32 savedFlags = gBattleTypeFlags;
+        bool8 savedInBattle = gMain.inBattle;
+        memcpy(savedOrder, gBattlePartyCurrentOrder, sizeof(savedOrder));
+        gPartyMenu.menuType = PARTY_MENU_TYPE_IN_BATTLE;
+        gMain.inBattle = TRUE;
+        gBattlePartyCurrentOrder[0] = 0x20;
+        gBattlePartyCurrentOrder[1] = 0x13;
+        gBattlePartyCurrentOrder[2] = 0x45;
+        struct PartyState *owner = &gBattleStruct->partyState[B_TRAINER_PLAYER][2];
+        *owner = *GetBattlerPartyState(0);
+        for (u32 doubles = 0; doubles < 2; doubles++)
+        {
+            gBattleTypeFlags = doubles ? BATTLE_TYPE_DOUBLE : 0;
+            for (u32 bars = 0; bars <= BREAK_BAR_MAX_EXTRA_BARS; bars++)
+            {
+                owner->breakBarsRemaining = bars;
+                const u16 *colors = Test_GetPartyMenuBreakBarColors(&gParties[B_TRAINER_PLAYER][0]);
+                EXPECT(colors != NULL);
+                EXPECT_EQ(colors[0], bars ? sIntroColors[bars][0] : gBattleInterface_BallDisplayPal[14]);
+                EXPECT_EQ(colors[1], bars ? sIntroColors[bars][1] : gBattleInterface_BallDisplayPal[15]);
+            }
+        }
+        // A different displayed slot still uses its own owner, including an ordinary bench mon.
+        EXPECT_EQ(Test_GetPartyMenuBreakBarColors(&gParties[B_TRAINER_PLAYER][1])[0], sIntroColors[5][0]);
+        EXPECT(Test_GetPartyMenuBreakBarColors(&gParties[B_TRAINER_PLAYER][2]) == NULL);
+        static const struct BreakBarConfig inactive = {.extraBars = 1, .flags = BREAK_BAR_START_INACTIVE};
+        owner->breakBarConfig = &inactive;
+        owner->breakBarsRemaining = 0;
+        owner->breakBarsPeak = 0;
+        EXPECT(Test_GetPartyMenuBreakBarColors(&gParties[B_TRAINER_PLAYER][0]) == NULL);
+        owner->breakBarsPeak = 1;
+        EXPECT_EQ(Test_GetPartyMenuBreakBarColors(&gParties[B_TRAINER_PLAYER][0])[0], gBattleInterface_BallDisplayPal[14]);
+        gMain.inBattle = FALSE;
+        EXPECT(Test_GetPartyMenuBreakBarColors(&gParties[B_TRAINER_PLAYER][0]) == NULL);
+        gMain.inBattle = TRUE;
+        gBattleTypeFlags = BATTLE_TYPE_DOUBLE | BATTLE_TYPE_MULTI;
+        EXPECT(Test_GetPartyMenuBreakBarColors(&gParties[B_TRAINER_PLAYER][0]) == NULL);
+        gBattleTypeFlags = BATTLE_TYPE_DOUBLE | BATTLE_TYPE_INGAME_PARTNER;
+        EXPECT(Test_GetPartyMenuBreakBarColors(&gParties[B_TRAINER_PLAYER][0]) == NULL);
+        gPartyMenu = savedMenu;
+        gMain.inBattle = savedInBattle;
+        gBattleTypeFlags = savedFlags;
+        memcpy(gBattlePartyCurrentOrder, savedOrder, sizeof(savedOrder));
+    }
+}
 
 static u32 IntroPalette(u32 battler)
 {
